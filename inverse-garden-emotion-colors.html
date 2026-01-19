@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inverse Garden: Emotion Colors</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 { color: #fff; margin-bottom: 10px; }
+        h2 { color: #aaa; font-weight: normal; margin-top: 40px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        h3 { color: #888; font-size: 14px; margin-top: 30px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .cluster-description {
+            color: #666;
+            font-style: italic;
+            margin-bottom: 20px;
+        }
+        
+        .emotion-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        
+        .swatch {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            margin-right: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .emotion-info {
+            flex: 1;
+        }
+        
+        .emotion-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .color-name {
+            color: #888;
+            font-size: 14px;
+        }
+        
+        .hex-code {
+            font-family: 'SF Mono', Monaco, monospace;
+            background: #2a2a2a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        .frequency {
+            color: #666;
+            font-size: 14px;
+            margin-left: 20px;
+        }
+        
+        .pending {
+            color: #555;
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        
+        .pending strong {
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+    <h1>Inverse Garden</h1>
+    <h2>Emotion Color Mapping</h2>
+    
+    <h3>Anxiety Cluster ✓</h3>
+    <p class="cluster-description">Fear-based, future-oriented worry, racing energy</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #00FFEF;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Anxious</div>
+            <div class="color-name">Bright electric teal</div>
+        </div>
+        <code class="hex-code">#00FFEF</code>
+        <div class="frequency">42 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #4CBB17;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Worried</div>
+            <div class="color-name">Kelly green</div>
+        </div>
+        <code class="hex-code">#4CBB17</code>
+        <div class="frequency">15 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #015F63;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Scared</div>
+            <div class="color-name">Deep blue teal</div>
+        </div>
+        <code class="hex-code">#015F63</code>
+        <div class="frequency">7 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #00F5A0;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Overwhelmed</div>
+            <div class="color-name">Bright mint green</div>
+        </div>
+        <code class="hex-code">#00F5A0</code>
+        <div class="frequency">4 uses</div>
+    </div>
+    
+    <h3>Sadness Cluster ✓</h3>
+    <p class="cluster-description">Low energy, heaviness, loss-adjacent</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #2563EB;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Sad</div>
+            <div class="color-name">Primary blue</div>
+        </div>
+        <code class="hex-code">#2563EB</code>
+        <div class="frequency">21 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #38BDF8;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Discouraged</div>
+            <div class="color-name">Bright sky blue</div>
+        </div>
+        <code class="hex-code">#38BDF8</code>
+        <div class="frequency">19 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #312E81;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Disappointed</div>
+            <div class="color-name">Dark indigo</div>
+        </div>
+        <code class="hex-code">#312E81</code>
+        <div class="frequency">3 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #BFDBFE;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Hopeless</div>
+            <div class="color-name">Baby blue</div>
+        </div>
+        <code class="hex-code">#BFDBFE</code>
+        <div class="frequency">3 uses</div>
+    </div>
+    
+    <h3>Frustration Cluster ✓</h3>
+    <p class="cluster-description">Blocked energy, irritation, friction</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #EF4444;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Stressed</div>
+            <div class="color-name">Vivid red</div>
+        </div>
+        <code class="hex-code">#EF4444</code>
+        <div class="frequency">18 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #EC4899;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Annoyed</div>
+            <div class="color-name">Magenta</div>
+        </div>
+        <code class="hex-code">#EC4899</code>
+        <div class="frequency">12 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #FBCFE8;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Frustrated</div>
+            <div class="color-name">Light pink</div>
+        </div>
+        <code class="hex-code">#FBCFE8</code>
+        <div class="frequency">11 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #BE123C;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Irritated</div>
+            <div class="color-name">Bright maroon</div>
+        </div>
+        <code class="hex-code">#BE123C</code>
+        <div class="frequency">10 uses</div>
+    </div>
+    
+    <h3>Shame Cluster ✓</h3>
+    <p class="cluster-description">Self-directed negativity, moral weight</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #FF5F1F;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Ashamed</div>
+            <div class="color-name">Neon orange</div>
+        </div>
+        <code class="hex-code">#FF5F1F</code>
+        <div class="frequency">9 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #FFBF00;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Guilty</div>
+            <div class="color-name">Amber</div>
+        </div>
+        <code class="hex-code">#FFBF00</code>
+        <div class="frequency">9 uses</div>
+    </div>
+    
+    <h3>Standalone Negative ✓</h3>
+    <p class="cluster-description">Unclustered negative and neutral emotions</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #FFEA00;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Drained</div>
+            <div class="color-name">Bright yellow</div>
+        </div>
+        <code class="hex-code">#FFEA00</code>
+        <div class="frequency">24 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #DFFF00;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Indifferent</div>
+            <div class="color-name">Chartreuse</div>
+        </div>
+        <code class="hex-code">#DFFF00</code>
+        <div class="frequency">8 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #FFFF8F;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Disgusted</div>
+            <div class="color-name">Canary yellow</div>
+        </div>
+        <code class="hex-code">#FFFF8F</code>
+        <div class="frequency">1 uses</div>
+    </div>
+    
+    <h3>Pending Clusters</h3>
+    <div class="pending">
+        <strong>Positive:</strong><br>
+        • Strength Cluster: Proud, Brave, Confident, Grateful<br>
+        • Calm Cluster: Relieved, Calm<br>
+        • Surprise Cluster: Surprised, Amused<br><br>
+        <strong>Neutral:</strong> Indifferent
+    </div>
+    
+    <h2>Positive Emotions</h2>
+    
+    <h3>Happiness Cluster ✓</h3>
+    <p class="cluster-description">Core positive affect, satisfaction</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #9CA3AF;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Content</div>
+            <div class="color-name">Grey</div>
+        </div>
+        <code class="hex-code">#9CA3AF</code>
+        <div class="frequency">47 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #64748B;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Satisfied</div>
+            <div class="color-name">Slate grey</div>
+        </div>
+        <code class="hex-code">#64748B</code>
+        <div class="frequency">12 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #4B5563;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Happy</div>
+            <div class="color-name">Dark grey</div>
+        </div>
+        <code class="hex-code">#4B5563</code>
+        <div class="frequency">7 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #1F2937;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Joyful</div>
+            <div class="color-name">Black</div>
+        </div>
+        <code class="hex-code">#1F2937</code>
+        <div class="frequency">2 uses</div>
+    </div>
+    
+    <h3>Energy Cluster ✓</h3>
+    <p class="cluster-description">Forward momentum, anticipation, intensity</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #78350F;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Hopeful</div>
+            <div class="color-name">Brown</div>
+        </div>
+        <code class="hex-code">#78350F</code>
+        <div class="frequency">19 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #988558;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Excited</div>
+            <div class="color-name">Dark tan</div>
+        </div>
+        <code class="hex-code">#988558</code>
+        <div class="frequency">9 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #D4A574;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Passionate</div>
+            <div class="color-name">Camel</div>
+        </div>
+        <code class="hex-code">#D4A574</code>
+        <div class="frequency">7 uses</div>
+    </div>
+    
+    <h3>Strength Cluster ✓</h3>
+    <p class="cluster-description">Self-assurance, accomplishment, gratitude</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #808000;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Grateful</div>
+            <div class="color-name">Olive green</div>
+        </div>
+        <code class="hex-code">#808000</code>
+        <div class="frequency">8 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #355E3B;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Proud</div>
+            <div class="color-name">Hunter green</div>
+        </div>
+        <code class="hex-code">#355E3B</code>
+        <div class="frequency">7 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #023020;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Brave</div>
+            <div class="color-name">Dark green</div>
+        </div>
+        <code class="hex-code">#023020</code>
+        <div class="frequency">2 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #A0AFA0;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Confident</div>
+            <div class="color-name">Silver green</div>
+        </div>
+        <code class="hex-code">#A0AFA0</code>
+        <div class="frequency">1 uses</div>
+    </div>
+    
+    <h3>Calm Cluster ✓</h3>
+    <p class="cluster-description">Release, settling, peace</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #8B8000;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Relieved</div>
+            <div class="color-name">Dark yellow</div>
+        </div>
+        <code class="hex-code">#8B8000</code>
+        <div class="frequency">9 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #8B4000;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Calm</div>
+            <div class="color-name">Dark orange</div>
+        </div>
+        <code class="hex-code">#8B4000</code>
+        <div class="frequency">3 uses</div>
+    </div>
+    
+    <h3>Surprise Cluster ✓</h3>
+    <p class="cluster-description">Unexpected, reactive</p>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #811331;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Surprised</div>
+            <div class="color-name">Claret</div>
+        </div>
+        <code class="hex-code">#811331</code>
+        <div class="frequency">2 uses</div>
+    </div>
+    
+    <div class="emotion-row">
+        <div class="swatch" style="background: #C9A9A6;"></div>
+        <div class="emotion-info">
+            <div class="emotion-name">Amused</div>
+            <div class="color-name">Dusty rose</div>
+        </div>
+        <code class="hex-code">#C9A9A6</code>
+        <div class="frequency">1 uses</div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,361 @@
+import type {
+  MoodEntry,
+  PlantType,
+  PlantDNA,
+  FlowerDNA,
+  SproutDNA,
+  DecayDNA,
+} from '../types';
+
+// ============================================
+// COLOR LOOKUP TABLES
+// From inverse-garden-gdd-v3.2.md
+// ============================================
+
+/**
+ * Emotion colors - Negative emotions are vibrant (appear on Flowers)
+ * Positive emotions are muted (appear on Decays)
+ */
+const EMOTION_COLORS: Record<string, string> = {
+  // Negative Emotions (Vibrant)
+  'Anxious': '#00FFEF',      // Bright electric teal
+  'Worried': '#4CBB17',      // Kelly green
+  'Scared': '#015F63',       // Deep blue teal
+  'Overwhelmed': '#00F5A0',  // Bright mint green
+  'Sad': '#2563EB',          // Primary blue
+  'Discouraged': '#38BDF8',  // Bright sky blue
+  'Disappointed': '#312E81', // Dark indigo
+  'Hopeless': '#BFDBFE',     // Baby blue
+  'Stressed': '#EF4444',     // Vivid red
+  'Annoyed': '#EC4899',      // Magenta
+  'Frustrated': '#FBCFE8',   // Light pink
+  'Irritated': '#BE123C',    // Bright maroon
+  'Ashamed': '#FF5F1F',      // Neon orange
+  'Guilty': '#FFBF00',       // Amber
+  'Drained': '#FFEA00',      // Bright yellow
+  'Disgusted': '#FFFF8F',    // Canary yellow
+
+  // Neutral Emotion
+  'Indifferent': '#DFFF00',  // Chartreuse
+
+  // Positive Emotions (Muted - appear on Decays)
+  'Content': '#9CA3AF',      // Grey
+  'Satisfied': '#64748B',    // Slate grey
+  'Happy': '#4B5563',        // Dark grey
+  'Joyful': '#1F2937',       // Near black
+  'Hopeful': '#78350F',      // Brown
+  'Excited': '#988558',      // Dark tan
+  'Passionate': '#D4A574',   // Camel
+  'Grateful': '#808000',     // Olive green
+  'Proud': '#355E3B',        // Hunter green
+  'Brave': '#023020',        // Dark green
+  'Confident': '#A0AFA0',    // Silver green
+  'Relieved': '#8B8000',     // Dark yellow
+  'Calm': '#8B4000',         // Dark orange
+  'Surprised': '#811331',    // Claret
+  'Amused': '#C9A9A6',       // Dusty rose
+
+  // Handle typos/variants found in the data
+  'Surpirsed': '#811331',    // Same as Surprised (typo in data)
+  'Peaceful': '#9CA3AF',     // Not in GDD - using grey like Content
+};
+
+/**
+ * Association colors - for stems, leaves, cracks
+ */
+const ASSOCIATION_COLORS: Record<string, string> = {
+  'Self Care': '#9DC183',    // Sage green
+  'Health': '#A0522D',       // Sienna
+  'Fitness': '#FF69B4',      // Hot pink
+  'Partner': '#FFB6C1',      // Light pink
+  'Family': '#00FF7F',       // Spring green
+  'Friends': '#E0FFFF',      // Light cyan
+  'Community': '#FFFFFF',    // White
+  'Work': '#DAA520',         // Goldenrod
+  'Tasks': '#708090',        // Slate gray
+  'Identity': '#9370DB',     // Medium purple
+  'Hobbies': '#B22222',      // Firebrick
+  'Travel': '#FFA500',       // Orange
+  'Weather': '#00BFFF',      // Deep sky blue
+};
+
+// Fallback colors for missing data
+const FALLBACK_EMOTION_COLOR = '#FFFFFF';     // White
+const FALLBACK_CENTER_COLOR = '#FFD700';      // Bright yellow
+const FALLBACK_ASSOCIATION_COLOR = '#FFD700'; // Bright yellow
+
+// ============================================
+// DEFAULT VALUES
+// From inverse-garden-gdd-v3.2.md "Recommended Defaults"
+// ============================================
+
+const FLOWER_DEFAULTS = {
+  petalCount: 8,
+  petalRows: 2,
+  petalLength: 2.5,
+  petalWidth: 1.2,
+  petalCurvature: 0.5,
+  glowIntensity: 1.5,
+  wobbleSpeed: 0.8,
+  stemBend: 0.2,
+  leafCount: 2,
+  leafSize: 1.0,
+  leafOrientation: 0,
+  leafAngle: 0.5,
+};
+
+const SPROUT_DEFAULTS = {
+  budSize: 1.0,
+  budPointiness: 0.5,
+  stemHeight: 1.0,
+  stemCurve: 0.2,
+  stemThickness: 0.8,
+  cotyledonSize: 1.0,
+  swaySpeed: 0.8,
+  swayAmount: 0.3,
+};
+
+const DECAY_DEFAULTS = {
+  aspectRatio: 1.0,
+  edgeWobble: 0.3,
+  crackCount: 8,
+  crackWobble: 0.4,
+};
+
+// Scale ranges by plant type
+const SCALE_RANGES = {
+  flower: { min: 0.6, max: 1.4 },
+  sprout: { min: 0.4, max: 0.8 },
+  decay: { min: 0.8, max: 1.8 },
+};
+
+// ============================================
+// MAPPING FUNCTIONS
+// ============================================
+
+/**
+ * Determine plant type from valence classification
+ *
+ * Very Unpleasant, Unpleasant, Slightly Unpleasant → Flower
+ * Neutral → Sprout
+ * Slightly Pleasant, Pleasant, Very Pleasant → Decay
+ */
+export function getPlantType(valenceClassification: string): PlantType {
+  const classification = valenceClassification.toLowerCase().trim();
+
+  if (classification.includes('unpleasant')) {
+    return 'flower';
+  }
+  if (classification === 'neutral') {
+    return 'sprout';
+  }
+  // pleasant variants
+  return 'decay';
+}
+
+/**
+ * Calculate scale from absolute valence value
+ *
+ * scale = minScale + (|valence| × (maxScale - minScale))
+ *
+ * Both -0.8 and +0.8 produce the same large scale - intensity matters, not direction.
+ */
+export function calculateScale(valence: number, plantType: PlantType): number {
+  const absValence = Math.abs(valence);
+  const { min, max } = SCALE_RANGES[plantType];
+  return min + absValence * (max - min);
+}
+
+/**
+ * Look up emotion color with fallback
+ */
+export function getEmotionColor(emotion: string): string {
+  return EMOTION_COLORS[emotion] || FALLBACK_EMOTION_COLOR;
+}
+
+/**
+ * Look up association color with fallback
+ */
+export function getAssociationColor(association: string): string {
+  return ASSOCIATION_COLORS[association] || FALLBACK_ASSOCIATION_COLOR;
+}
+
+/**
+ * Get emotion colors array for a list of emotions
+ * If empty, returns fallback white
+ */
+function getEmotionColors(emotions: string[]): string[] {
+  if (emotions.length === 0) {
+    return [FALLBACK_EMOTION_COLOR];
+  }
+  return emotions.map(getEmotionColor);
+}
+
+/**
+ * Get association colors array for a list of associations
+ * If empty, returns fallback yellow
+ */
+function getAssociationColors(associations: string[]): string[] {
+  if (associations.length === 0) {
+    return [FALLBACK_ASSOCIATION_COLOR];
+  }
+  return associations.map(getAssociationColor);
+}
+
+// ============================================
+// DNA BUILDERS
+// ============================================
+
+/**
+ * Build FlowerDNA from a mood entry
+ *
+ * Color application:
+ * - 1 emotion: Entire bloom is that color
+ * - 2-3 emotions: Center is primary, petals rotate through all
+ */
+function buildFlowerDNA(entry: MoodEntry): FlowerDNA {
+  const emotionColors = getEmotionColors(entry.emotions);
+  const associationColors = getAssociationColors(entry.associations);
+
+  // Center color is always the primary emotion
+  const centerColor = entry.emotions.length === 0
+    ? FALLBACK_CENTER_COLOR
+    : emotionColors[0];
+
+  // Petal colors cycle through all emotions
+  const petalColors = emotionColors;
+
+  return {
+    name: entry.id,
+    description: `Flower from ${entry.timestamp.toLocaleDateString()}`,
+
+    // Fixed defaults
+    ...FLOWER_DEFAULTS,
+
+    // Data-driven values
+    petalColors,
+    centerColor,
+    stemColors: associationColors,
+    scale: calculateScale(entry.valence, 'flower'),
+  };
+}
+
+/**
+ * Build SproutDNA from a mood entry
+ *
+ * Color application:
+ * - 1 emotion: Entire bud is that color
+ * - 2 emotions: Bud base is primary, stripe is secondary
+ * - 3 emotions: Bud base is primary, two stripes are secondary/tertiary
+ *
+ * Association application:
+ * - 1 association: Stem and cotyledons are that color
+ * - 2+ associations: Stem = primary, cotyledons = secondary/tertiary
+ */
+function buildSproutDNA(entry: MoodEntry): SproutDNA {
+  const emotionColors = getEmotionColors(entry.emotions);
+  const associationColors = getAssociationColors(entry.associations);
+
+  // Primary emotion is bud color, with stripes for 2nd/3rd
+  const budColor = emotionColors[0];
+  const budStripe2Color = emotionColors[1] || budColor;
+  const budStripe3Color = emotionColors[2] || budColor;
+
+  // Primary association is stem, 2nd/3rd are cotyledons
+  const stemColor = associationColors[0];
+  const cotyledon1Color = associationColors[1] || stemColor;
+  const cotyledon2Color = associationColors[2] || stemColor;
+
+  return {
+    name: entry.id,
+    description: `Sprout from ${entry.timestamp.toLocaleDateString()}`,
+
+    // Fixed defaults
+    ...SPROUT_DEFAULTS,
+
+    // Data-driven values
+    budColor,
+    budStripe2Color,
+    budStripe3Color,
+    stemColor,
+    cotyledon1Color,
+    cotyledon2Color,
+    scale: calculateScale(entry.valence, 'sprout'),
+  };
+}
+
+/**
+ * Build DecayDNA from a mood entry
+ *
+ * Color application:
+ * - 1 emotion: All three layers are that color
+ * - 2 emotions: Layer 1 (inner) = primary, Layers 2-3 = secondary
+ * - 3 emotions: Layer 1 = primary, Layer 2 = secondary, Layer 3 = tertiary
+ *
+ * Crack application:
+ * - 1 association: All cracks are that color
+ * - 2-3 associations: Cracks cycle through association colors
+ */
+function buildDecayDNA(entry: MoodEntry): DecayDNA {
+  const emotionColors = getEmotionColors(entry.emotions);
+  const associationColors = getAssociationColors(entry.associations);
+
+  // Layer colors based on emotion count
+  const layer1Color = emotionColors[0];
+  const layer2Color = emotionColors[1] || layer1Color;
+  const layer3Color = emotionColors[2] || layer1Color;
+
+  // Crack colors cycle through associations
+  const crack1Color = associationColors[0];
+  const crack2Color = associationColors[1] || crack1Color;
+  const crack3Color = associationColors[2] || crack1Color;
+
+  return {
+    name: entry.id,
+    description: `Decay from ${entry.timestamp.toLocaleDateString()}`,
+
+    // Fixed defaults
+    ...DECAY_DEFAULTS,
+
+    // Data-driven values - note: decay uses 'size' not 'scale'
+    size: calculateScale(entry.valence, 'decay'),
+    layer1Color,
+    layer2Color,
+    layer3Color,
+    crack1Color,
+    crack2Color,
+    crack3Color,
+  };
+}
+
+// ============================================
+// MAIN EXPORT
+// ============================================
+
+/**
+ * Convert a MoodEntry into the appropriate PlantDNA
+ *
+ * This is the main function that ties everything together:
+ * 1. Determines plant type from valence classification
+ * 2. Builds the appropriate DNA object with colors from emotions/associations
+ * 3. Calculates scale from valence intensity
+ */
+export function entryToDNA(entry: MoodEntry): PlantDNA {
+  const plantType = getPlantType(entry.valenceClassification);
+
+  switch (plantType) {
+    case 'flower':
+      return { type: 'flower', dna: buildFlowerDNA(entry) };
+    case 'sprout':
+      return { type: 'sprout', dna: buildSproutDNA(entry) };
+    case 'decay':
+      return { type: 'decay', dna: buildDecayDNA(entry) };
+  }
+}
+
+/**
+ * Convert multiple entries to DNA objects
+ */
+export function entriesToDNA(entries: MoodEntry[]): PlantDNA[] {
+  return entries.map(entryToDNA);
+}

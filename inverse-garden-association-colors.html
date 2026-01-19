@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inverse Garden: Association Colors</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        h1 { color: #fff; margin-bottom: 10px; }
+        h2 { color: #aaa; font-weight: normal; margin-top: 40px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        h3 { color: #888; font-size: 14px; margin-top: 30px; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .cluster-description {
+            color: #666;
+            font-style: italic;
+            margin-bottom: 20px;
+        }
+        
+        .association-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #2a2a2a;
+        }
+        
+        .swatch {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            margin-right: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .association-info {
+            flex: 1;
+        }
+        
+        .association-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+        }
+        
+        .color-name {
+            color: #888;
+            font-size: 14px;
+        }
+        
+        .hex-code {
+            font-family: 'SF Mono', Monaco, monospace;
+            background: #2a2a2a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #aaa;
+        }
+        
+        .frequency {
+            color: #666;
+            font-size: 14px;
+            margin-left: 20px;
+            min-width: 70px;
+            text-align: right;
+        }
+        
+        .note {
+            color: #555;
+            font-size: 14px;
+            margin-top: 40px;
+            padding: 20px;
+            background: #222;
+            border-radius: 8px;
+            line-height: 1.6;
+        }
+        
+        .note strong {
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <h1>Inverse Garden</h1>
+    <h2>Association Color Mapping (Stems & Leaves)</h2>
+    
+    <h3>Personal Care Cluster</h3>
+    <p class="cluster-description">Internal well-being, body, physical self</p>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #9DC183;"></div>
+        <div class="association-info">
+            <div class="association-name">Self Care</div>
+            <div class="color-name">Sage green</div>
+        </div>
+        <code class="hex-code">#9DC183</code>
+        <div class="frequency">105 uses</div>
+    </div>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #A0522D;"></div>
+        <div class="association-info">
+            <div class="association-name">Health</div>
+            <div class="color-name">Sienna</div>
+        </div>
+        <code class="hex-code">#A0522D</code>
+        <div class="frequency">93 uses</div>
+    </div>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #FF69B4;"></div>
+        <div class="association-info">
+            <div class="association-name">Fitness</div>
+            <div class="color-name">Hot pink</div>
+        </div>
+        <code class="hex-code">#FF69B4</code>
+        <div class="frequency">9 uses</div>
+    </div>
+    
+    <h3>Relationships Cluster</h3>
+    <p class="cluster-description">People connections, bonds</p>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #FFB6C1;"></div>
+        <div class="association-info">
+            <div class="association-name">Partner</div>
+            <div class="color-name">Light pink</div>
+        </div>
+        <code class="hex-code">#FFB6C1</code>
+        <div class="frequency">45 uses</div>
+    </div>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #00FF7F;"></div>
+        <div class="association-info">
+            <div class="association-name">Family</div>
+            <div class="color-name">Spring green</div>
+        </div>
+        <code class="hex-code">#00FF7F</code>
+        <div class="frequency">42 uses</div>
+    </div>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #E0FFFF;"></div>
+        <div class="association-info">
+            <div class="association-name">Friends</div>
+            <div class="color-name">Light cyan</div>
+        </div>
+        <code class="hex-code">#E0FFFF</code>
+        <div class="frequency">4 uses</div>
+    </div>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #FFFFFF; border: 1px solid #333;"></div>
+        <div class="association-info">
+            <div class="association-name">Community</div>
+            <div class="color-name">White</div>
+        </div>
+        <code class="hex-code">#FFFFFF</code>
+        <div class="frequency">1 use</div>
+    </div>
+    
+    <h3>Productivity Cluster</h3>
+    <p class="cluster-description">Work, accomplishment, getting things done</p>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #DAA520;"></div>
+        <div class="association-info">
+            <div class="association-name">Work</div>
+            <div class="color-name">Goldenrod</div>
+        </div>
+        <code class="hex-code">#DAA520</code>
+        <div class="frequency">67 uses</div>
+    </div>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #708090;"></div>
+        <div class="association-info">
+            <div class="association-name">Tasks</div>
+            <div class="color-name">Slate gray</div>
+        </div>
+        <code class="hex-code">#708090</code>
+        <div class="frequency">12 uses</div>
+    </div>
+    
+    <h3>Self/Growth Cluster</h3>
+    <p class="cluster-description">Internal journey, expression, who you are</p>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #9370DB;"></div>
+        <div class="association-info">
+            <div class="association-name">Identity</div>
+            <div class="color-name">Medium purple</div>
+        </div>
+        <code class="hex-code">#9370DB</code>
+        <div class="frequency">35 uses</div>
+    </div>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #B22222;"></div>
+        <div class="association-info">
+            <div class="association-name">Hobbies</div>
+            <div class="color-name">Firebrick</div>
+        </div>
+        <code class="hex-code">#B22222</code>
+        <div class="frequency">34 uses</div>
+    </div>
+    
+    <h3>External/Context Cluster</h3>
+    <p class="cluster-description">Situational, environmental</p>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #FFA500;"></div>
+        <div class="association-info">
+            <div class="association-name">Travel</div>
+            <div class="color-name">Orange</div>
+        </div>
+        <code class="hex-code">#FFA500</code>
+        <div class="frequency">9 uses</div>
+    </div>
+    
+    <div class="association-row">
+        <div class="swatch" style="background: #00BFFF;"></div>
+        <div class="association-info">
+            <div class="association-name">Weather</div>
+            <div class="color-name">Deep sky blue</div>
+        </div>
+        <code class="hex-code">#00BFFF</code>
+        <div class="frequency">2 uses</div>
+    </div>
+    
+    <div class="note">
+        <strong>Design Note:</strong> Association colors appear on stems and leaves as accent colors, 
+        while emotion colors control the flower/bloom. The spatial separation means some color overlap 
+        with emotions is acceptable—the eye distinguishes "stem part" from "flower part" before 
+        processing hue similarity.
+    </div>
+</body>
+</html>
