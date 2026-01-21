@@ -72,7 +72,7 @@ export interface SproutDNA {
   scale: number;              // 0.3-0.8 (always smaller than flowers)
 }
 
-// Parsed mood entry from CSV
+// Parsed mood entry from CSV (before percentile calculation)
 export interface MoodEntry {
   id: string;                    // Unique identifier (timestamp-based)
   timestamp: Date;
@@ -81,6 +81,11 @@ export interface MoodEntry {
   associations: string[];        // Parsed from Associations field
   valence: number;               // -1 to 1
   valenceClassification: string; // "Very Unpleasant", "Neutral", etc.
+}
+
+// MoodEntry with percentile calculated (used for scale)
+export interface MoodEntryWithPercentile extends MoodEntry {
+  scalePercentile: number;       // 0-100, calculated at load time based on |valence| rank within type
 }
 
 // What type of plant this entry becomes

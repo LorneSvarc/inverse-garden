@@ -1,11 +1,13 @@
 import type {
   MoodEntry,
+  MoodEntryWithPercentile,
   PlantType,
   PlantDNA,
   FlowerDNA,
   SproutDNA,
   DecayDNA,
 } from '../types';
+import { percentileToScale } from './percentileCalculator';
 
 // ============================================
 // COLOR LOOKUP TABLES
@@ -122,11 +124,12 @@ const DECAY_DEFAULTS = {
   crackWobble: 0.4,
 };
 
-// Scale ranges by plant type
+// Scale ranges by plant type (updated for Phase 1.5)
+// These use percentile-based mapping for better visual variety
 const SCALE_RANGES = {
-  flower: { min: 0.6, max: 1.4 },
-  sprout: { min: 0.4, max: 0.8 },
-  decay: { min: 0.8, max: 1.8 },
+  flower: { min: 0.4, max: 1.8 },
+  sprout: { min: 0.8, max: 1.0 },  // Narrow range, always visible
+  decay: { min: 0.4, max: 1.8 },
 };
 
 // ============================================
@@ -154,11 +157,26 @@ export function getPlantType(valenceClassification: string): PlantType {
 }
 
 /**
- * Calculate scale from absolute valence value
+ * Calculate scale from percentile (Phase 1.5 - percentile-based scaling)
+ *
+ * Percentile-based scaling ensures visual variety even when raw valence values cluster.
+ * The percentile is pre-calculated and stored with each entry.
+ *
+ * @param percentile - 0-100, calculated from |valence| rank within plant type
+ * @param plantType - flower, sprout, or decay
+ */
+export function calculateScaleFromPercentile(percentile: number, plantType: PlantType): number {
+  const { min, max } = SCALE_RANGES[plantType];
+  return percentileToScale(percentile, min, max);
+}
+
+/**
+ * Calculate scale from absolute valence value (legacy - kept for backwards compatibility)
  *
  * scale = minScale + (|valence| × (maxScale - minScale))
  *
  * Both -0.8 and +0.8 produce the same large scale - intensity matters, not direction.
+ * @deprecated Use calculateScaleFromPercentile for better visual variety
  */
 export function calculateScale(valence: number, plantType: PlantType): number {
   const absValence = Math.abs(valence);
@@ -213,7 +231,7 @@ function getAssociationColors(associations: string[]): string[] {
  * - 1 emotion: Entire bloom is that color
  * - 2-3 emotions: Center is primary, petals rotate through all
  */
-function buildFlowerDNA(entry: MoodEntry): FlowerDNA {
+function buildFlowerDNA(entry: MoodEntryWithPercentile): FlowerDNA {
   const emotionColors = getEmotionColors(entry.emotions);
   const associationColors = getAssociationColors(entry.associations);
 
@@ -236,7 +254,7 @@ function buildFlowerDNA(entry: MoodEntry): FlowerDNA {
     petalColors,
     centerColor,
     stemColors: associationColors,
-    scale: calculateScale(entry.valence, 'flower'),
+    scale: calculateScaleFromPercentile(entry.scalePercentile, 'flower'),
   };
 }
 
@@ -252,7 +270,7 @@ function buildFlowerDNA(entry: MoodEntry): FlowerDNA {
  * - 1 association: Stem and cotyledons are that color
  * - 2+ associations: Stem = primary, cotyledons = secondary/tertiary
  */
-function buildSproutDNA(entry: MoodEntry): SproutDNA {
+function buildSproutDNA(entry: MoodEntryWithPercentile): SproutDNA {
   const emotionColors = getEmotionColors(entry.emotions);
   const associationColors = getAssociationColors(entry.associations);
 
@@ -280,7 +298,7 @@ function buildSproutDNA(entry: MoodEntry): SproutDNA {
     stemColor,
     cotyledon1Color,
     cotyledon2Color,
-    scale: calculateScale(entry.valence, 'sprout'),
+    scale: calculateScaleFromPercentile(entry.scalePercentile, 'sprout'),
   };
 }
 
@@ -296,7 +314,7 @@ function buildSproutDNA(entry: MoodEntry): SproutDNA {
  * - 1 association: All cracks are that color
  * - 2-3 associations: Cracks cycle through association colors
  */
-function buildDecayDNA(entry: MoodEntry): DecayDNA {
+function buildDecayDNA(entry: MoodEntryWithPercentile): DecayDNA {
   const emotionColors = getEmotionColors(entry.emotions);
   const associationColors = getAssociationColors(entry.associations);
 
@@ -318,7 +336,7 @@ function buildDecayDNA(entry: MoodEntry): DecayDNA {
     ...DECAY_DEFAULTS,
 
     // Data-driven values - note: decay uses 'size' not 'scale'
-    size: calculateScale(entry.valence, 'decay'),
+    size: calculateScaleFromPercentile(entry.scalePercentile, 'decay'),
     layer1Color,
     layer2Color,
     layer3Color,
@@ -333,14 +351,17 @@ function buildDecayDNA(entry: MoodEntry): DecayDNA {
 // ============================================
 
 /**
- * Convert a MoodEntry into the appropriate PlantDNA
+ * Convert a MoodEntryWithPercentile into the appropriate PlantDNA
  *
  * This is the main function that ties everything together:
  * 1. Determines plant type from valence classification
  * 2. Builds the appropriate DNA object with colors from emotions/associations
- * 3. Calculates scale from valence intensity
+ * 3. Calculates scale from percentile rank (for visual variety)
+ *
+ * Note: Requires entries with scalePercentile pre-calculated.
+ * Use parseCSVWithPercentiles() to load data with percentiles.
  */
-export function entryToDNA(entry: MoodEntry): PlantDNA {
+export function entryToDNA(entry: MoodEntryWithPercentile): PlantDNA {
   const plantType = getPlantType(entry.valenceClassification);
 
   switch (plantType) {
@@ -356,6 +377,6 @@ export function entryToDNA(entry: MoodEntry): PlantDNA {
 /**
  * Convert multiple entries to DNA objects
  */
-export function entriesToDNA(entries: MoodEntry[]): PlantDNA[] {
+export function entriesToDNA(entries: MoodEntryWithPercentile[]): PlantDNA[] {
   return entries.map(entryToDNA);
 }

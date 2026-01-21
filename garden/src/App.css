@@ -129,3 +129,194 @@ html, body, #root {
 canvas {
   display: block;
 }
+
+/* Entry date in info panel */
+.entry-date {
+  margin-left: 8px;
+  color: #666;
+  font-size: 11px;
+}
+
+.more-entries {
+  color: #666;
+  font-style: italic;
+  text-align: center;
+}
+
+/* ============================================
+   TIMELINE CONTROLS
+   ============================================ */
+
+.timeline-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+  padding: 20px 20px 24px 20px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.timeline-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Play/Pause button */
+.play-button {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.play-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.play-button:active {
+  transform: scale(0.95);
+}
+
+/* Speed selector */
+.speed-selector {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.speed-button {
+  padding: 6px 10px;
+  border: 1px solid #444;
+  background: transparent;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.speed-button:hover {
+  border-color: #666;
+  color: #ccc;
+}
+
+.speed-button.active {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+/* Slider container */
+.slider-container {
+  flex: 1;
+  min-width: 200px;
+}
+
+.timeline-slider {
+  width: 100%;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #333;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.timeline-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.1s ease;
+}
+
+.timeline-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.timeline-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
+.date-label {
+  font-size: 11px;
+  color: #666;
+}
+
+/* Current date display */
+.current-date {
+  text-align: right;
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.date-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.plant-count {
+  display: block;
+  font-size: 12px;
+  color: #888;
+  margin-top: 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .timeline-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .speed-selector {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .slider-container {
+    order: 2;
+    width: 100%;
+  }
+
+  .current-date {
+    order: 1;
+    text-align: center;
+    min-width: auto;
+  }
+}

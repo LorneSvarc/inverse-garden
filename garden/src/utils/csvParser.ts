@@ -1,4 +1,5 @@
-import type { MoodEntry } from '../types';
+import type { MoodEntry, MoodEntryWithPercentile } from '../types';
+import { calculatePercentiles } from './percentileCalculator';
 
 /**
  * Parses the Apple Health State of Mind CSV export into typed MoodEntry objects.
@@ -108,11 +109,26 @@ function parseCSVLine(line: string): string[] {
 
 /**
  * Parse timestamp from format: "2026-01-09 15:34:06 -0500"
+ *
+ * Safari is strict about date formats, so we need to convert to ISO 8601.
+ * Input:  "2026-01-09 15:34:06 -0500"
+ * Output: "2026-01-09T15:34:06-05:00" (ISO 8601 with timezone)
  */
 function parseTimestamp(str: string): Date | null {
   try {
-    // JavaScript's Date can parse this format directly
-    const date = new Date(str);
+    // Convert "2026-01-09 15:34:06 -0500" to "2026-01-09T15:34:06-05:00"
+    // Step 1: Replace space between date and time with 'T'
+    // Step 2: Convert timezone from "-0500" to "-05:00"
+    const match = str.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})\s+([+-])(\d{2})(\d{2})$/);
+
+    if (!match) {
+      return null;
+    }
+
+    const [, datePart, timePart, tzSign, tzHours, tzMinutes] = match;
+    const isoString = `${datePart}T${timePart}${tzSign}${tzHours}:${tzMinutes}`;
+
+    const date = new Date(isoString);
     if (isNaN(date.getTime())) {
       return null;
     }
@@ -143,4 +159,22 @@ export async function loadCSVFromPath(path: string): Promise<MoodEntry[]> {
   const response = await fetch(path);
   const text = await response.text();
   return parseCSV(text);
+}
+
+/**
+ * Parse CSV and calculate percentiles in one step
+ * This is the main function to use when loading data for the garden.
+ */
+export function parseCSVWithPercentiles(csvText: string): MoodEntryWithPercentile[] {
+  const entries = parseCSV(csvText);
+  return calculatePercentiles(entries);
+}
+
+/**
+ * Load CSV from path and calculate percentiles
+ */
+export async function loadCSVWithPercentiles(path: string): Promise<MoodEntryWithPercentile[]> {
+  const response = await fetch(path);
+  const text = await response.text();
+  return parseCSVWithPercentiles(text);
 }
