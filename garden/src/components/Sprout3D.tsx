@@ -109,9 +109,9 @@ const Sprout3D: React.FC<Sprout3DProps> = ({ dna, position = [0, 0, 0] }) => {
   const budRadius = 0.154 * dna.budSize;
   const budHeight = 0.231 * dna.budSize;
 
-  // Calculate positioning so the stem reaches the ground
+  // Calculate positioning so the stem reaches the ground (ground is at Y=0)
   const stemBottomLocalY = -0.9 * dna.stemHeight;
-  const groupY = -2.55 - (stemBottomLocalY * dna.scale);
+  const groupY = 0 - (stemBottomLocalY * dna.scale);
 
   // Memoize bud shape points to avoid recreating on every render
   const budShapePoints = useMemo(() => {

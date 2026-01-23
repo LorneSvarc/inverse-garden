@@ -178,8 +178,8 @@ const Decay3D: React.FC<Decay3DProps> = ({ dna, position = [0, 0, 0] }) => {
 
   return (
     <group position={position}>
-      {/* Decay Group - positioned flat on ground (y = -2.5 is ground level) */}
-      <group position={[0, -2.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* Decay Group - positioned flat on ground (y = 0 is ground level) */}
+      <group position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]}>
 
         {/* Layer 3 - Outermost/Bottom */}
         <mesh position={[0, 0, layer3Height]} geometry={layer3Geometry}>

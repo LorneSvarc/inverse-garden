@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
 import type { MoodEntryWithPercentile, PlantDNA } from './types';
 import { parseCSVWithPercentiles } from './utils/csvParser';
 import { entryToDNA } from './utils/dnaMapper';
@@ -9,7 +10,16 @@ import Flower3D from './components/Flower3D';
 import Sprout3D from './components/Sprout3D';
 import Decay3D from './components/Decay3D';
 import TimelineControls from './components/TimelineControls';
+import TestScene from './components/TestScene';
 import './App.css';
+
+/**
+ * Check if test mode is enabled via URL parameter
+ */
+function isTestMode(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('test') === 'true';
+}
 
 /**
  * Plant component that renders the appropriate 3D component based on DNA type
@@ -28,6 +38,7 @@ function Plant({ plantDNA, position }: { plantDNA: PlantDNA; position: [number, 
 /**
  * Ground plane for the garden
  * Size matches the garden radius from positionCalculator
+ * Uses DoubleSide rendering to prevent disappearing at certain camera angles
  */
 function Ground() {
   const { gardenRadius } = getLayoutConfig();
@@ -35,9 +46,9 @@ function Ground() {
   const groundRadius = gardenRadius * 1.3;
 
   return (
-    <mesh position={[0, -2.5, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+    <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <circleGeometry args={[groundRadius, 64]} />
-      <meshStandardMaterial color="#8B7355" roughness={1} />
+      <meshStandardMaterial color="#8B7355" roughness={1} side={THREE.DoubleSide} />
     </mesh>
   );
 }
@@ -76,6 +87,11 @@ function getTimeBounds(entries: MoodEntryWithPercentile[]): { earliest: Date; la
 }
 
 function App() {
+  // Check for test mode
+  if (isTestMode()) {
+    return <TestScene />;
+  }
+
   // All entries from the CSV (sorted by timestamp)
   const [allEntries, setAllEntries] = useState<MoodEntryWithPercentile[]>([]);
 

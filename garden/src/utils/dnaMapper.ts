@@ -87,6 +87,23 @@ const FALLBACK_CENTER_COLOR = '#FFD700';      // Bright yellow
 const FALLBACK_ASSOCIATION_COLOR = '#FFD700'; // Bright yellow
 
 // ============================================
+// SEEDED RANDOM FOR REPRODUCIBLE VARIETY
+// ============================================
+
+/**
+ * Simple seeded PRNG using mulberry32 algorithm
+ * Returns a function that generates numbers 0-1
+ */
+function createSeededRandom(seed: number): () => number {
+  return function () {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ============================================
 // DEFAULT VALUES
 // From inverse-garden-gdd-v3.2.md "Recommended Defaults"
 // ============================================
@@ -94,12 +111,12 @@ const FALLBACK_ASSOCIATION_COLOR = '#FFD700'; // Bright yellow
 const FLOWER_DEFAULTS = {
   petalCount: 8,
   petalRows: 2,
-  petalLength: 2.5,
-  petalWidth: 1.2,
+  petalLength: 1.2,   // Reduced from 2.5 for better garden density
+  petalWidth: 0.6,    // Reduced from 1.2, keeps proportions similar
   petalCurvature: 0.5,
   glowIntensity: 1.5,
   wobbleSpeed: 0.8,
-  stemBend: 0.2,
+  // stemBend is now randomized per-flower, not a static default
   leafCount: 2,
   leafSize: 1.0,
   leafOrientation: 0,
@@ -230,6 +247,10 @@ function getAssociationColors(associations: string[]): string[] {
  * Color application:
  * - 1 emotion: Entire bloom is that color
  * - 2-3 emotions: Center is primary, petals rotate through all
+ *
+ * Per-flower variety (seeded from timestamp for reproducibility):
+ * - rotation: Random Y-axis rotation (0 to 2π) to break up clone army look
+ * - stemBend: Random bend between 0.1 and 0.5 for organic variety
  */
 function buildFlowerDNA(entry: MoodEntryWithPercentile): FlowerDNA {
   const emotionColors = getEmotionColors(entry.emotions);
@@ -243,6 +264,15 @@ function buildFlowerDNA(entry: MoodEntryWithPercentile): FlowerDNA {
   // Petal colors cycle through all emotions
   const petalColors = emotionColors;
 
+  // Create seeded random from timestamp for reproducible variety
+  const random = createSeededRandom(entry.timestamp.getTime());
+
+  // Random Y-axis rotation (0 to 2π) - each flower faces a different direction
+  const rotation = random() * Math.PI * 2;
+
+  // Random stem bend between 0.1 and 0.5 for organic variety
+  const stemBend = 0.1 + random() * 0.4;
+
   return {
     name: entry.id,
     description: `Flower from ${entry.timestamp.toLocaleDateString()}`,
@@ -255,6 +285,10 @@ function buildFlowerDNA(entry: MoodEntryWithPercentile): FlowerDNA {
     centerColor,
     stemColors: associationColors,
     scale: calculateScaleFromPercentile(entry.scalePercentile, 'flower'),
+
+    // Per-flower variety (seeded from timestamp)
+    rotation,
+    stemBend,
   };
 }
 

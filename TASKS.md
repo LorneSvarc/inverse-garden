@@ -154,6 +154,7 @@ Three-level positioning system:
 | Day scatter radius | ±4 units | How far a day drifts from spiral position (reduced from 8 to fix center-clustering) |
 | Entry scatter radius | ±1.5 units | How far entries spread within a day |
 | Minimum entry spacing | 0.8 units | Prevent direct overlap within clusters |
+| Minimum stem distance | 2.0 units | Global collision detection - prevents stem overlap |
 
 ### Design Rationale
 
@@ -290,3 +291,20 @@ cd garden && npx tsc --noEmit
 - Plants now have stable positions that don't change as timeline scrubs
 - Ground sized to match 25-unit garden radius
 - Camera repositioned for better garden overview
+
+### 2025-01-23 - Phase 2.5 Refinements
+- **Test Mode:** Added `?test=true` URL parameter for calibration scene
+  - Shows 5 flowers at different scales (0.4 to 1.8)
+  - Shows 3-flower cluster for spacing visualization
+  - Helps tune sizes and spacing before algorithm adjustments
+- **Flower Rendering Fixes:**
+  - Fixed stem positioning: base now at ground level (Y=0), not buried
+  - Added random Y-rotation per flower (seeded from timestamp) - breaks "clone army" look
+  - Increased and randomized stem bend (0.1-0.5) for organic variety
+  - Reduced flower size: petalLength 2.5→1.2, petalWidth 1.2→0.6 (roughly halved footprint)
+- **Ground Plane:** Added DoubleSide rendering to fix disappearing at camera angles
+- **Global Collision Detection:** Added to positionCalculator.ts
+  - `minStemDistance: 2.0` prevents stem overlap across all plants
+  - Nudges colliding positions outward until clear
+- **Coordinate System:** Unified Y=0 as ground level across all plant types
+  - Updated Sprout3D and Decay3D to match new ground level

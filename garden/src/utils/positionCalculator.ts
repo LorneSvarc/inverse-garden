@@ -30,6 +30,7 @@ const CONFIG = {
   dayScatterRadius: 4,        // How far a day drifts from spiral position (reduced from 8 to fix center-clustering)
   entryScatterRadius: 1.5,    // How far entries spread within a day
   minEntrySpacing: 0.8,       // Minimum distance between entries in same day cluster
+  minStemDistance: 2.0,       // Global minimum distance between ANY two plant stems
 };
 
 // ============================================
@@ -174,49 +175,84 @@ export function calculatePositions(
     }
   }
 
-  // Now assign positions to individual entries
+  // Track ALL placed positions globally for collision detection
+  const allPlacedPositions: [number, number][] = [];
+
+  /**
+   * Check if a position collides with any already-placed position
+   * Returns true if too close to any existing plant
+   */
+  function hasGlobalCollision(x: number, z: number): boolean {
+    return allPlacedPositions.some(([px, pz]) => {
+      const dx = x - px;
+      const dz = z - pz;
+      return Math.sqrt(dx * dx + dz * dz) < CONFIG.minStemDistance;
+    });
+  }
+
+  /**
+   * Nudge a position outward from center until it's clear of collisions
+   * Returns the adjusted [x, z] position
+   */
+  function nudgeUntilClear(x: number, z: number, random: () => number): [number, number] {
+    let nudgeX = x;
+    let nudgeZ = z;
+    let attempts = 0;
+    const maxAttempts = 50;
+
+    while (hasGlobalCollision(nudgeX, nudgeZ) && attempts < maxAttempts) {
+      // Calculate direction from center
+      const dist = Math.sqrt(nudgeX * nudgeX + nudgeZ * nudgeZ);
+      const angle = dist > 0.01 ? Math.atan2(nudgeZ, nudgeX) : random() * Math.PI * 2;
+
+      // Add some randomness to the nudge direction
+      const nudgeAngle = angle + (random() - 0.5) * Math.PI * 0.5;
+      const nudgeDistance = CONFIG.minStemDistance * 0.5;
+
+      nudgeX += Math.cos(nudgeAngle) * nudgeDistance;
+      nudgeZ += Math.sin(nudgeAngle) * nudgeDistance;
+
+      // Clamp to garden bounds
+      const newDist = Math.sqrt(nudgeX * nudgeX + nudgeZ * nudgeZ);
+      if (newDist > CONFIG.gardenRadius * 0.95) {
+        const scale = (CONFIG.gardenRadius * 0.95) / newDist;
+        nudgeX *= scale;
+        nudgeZ *= scale;
+      }
+
+      attempts++;
+    }
+
+    return [nudgeX, nudgeZ];
+  }
+
+  // Now assign positions to individual entries with global collision detection
   for (const [dateStr, dayEntries] of entriesByDate) {
     const [dayX, dayZ] = dayPositions.get(dateStr)!;
 
     if (dayEntries.length === 1) {
-      // Single entry on this day - use day position directly
-      positions.set(dayEntries[0].id, [dayX, 0, dayZ]);
+      // Single entry on this day - use day position, but check for global collision
+      const entryRandom = createSeededRandom(timestampToSeed(dayEntries[0].timestamp));
+      const [finalX, finalZ] = nudgeUntilClear(dayX, dayZ, entryRandom);
+      allPlacedPositions.push([finalX, finalZ]);
+      positions.set(dayEntries[0].id, [finalX, 0, finalZ]);
     } else {
       // Multiple entries - scatter them around the day position
-      const placedPositions: [number, number][] = [];
-
       for (const entry of dayEntries) {
         // Seed random from entry's specific timestamp
         const entryRandom = createSeededRandom(timestampToSeed(entry.timestamp));
 
-        let entryX: number;
-        let entryZ: number;
-        let attempts = 0;
-        const maxAttempts = 20;
+        // Start with scatter around day position
+        const angle = entryRandom() * 2 * Math.PI;
+        const distance = entryRandom() * CONFIG.entryScatterRadius;
 
-        // Try to find a position that doesn't overlap with others in the cluster
-        do {
-          const angle = entryRandom() * 2 * Math.PI;
-          const distance = entryRandom() * CONFIG.entryScatterRadius;
+        let entryX = dayX + Math.cos(angle) * distance;
+        let entryZ = dayZ + Math.sin(angle) * distance;
 
-          entryX = dayX + Math.cos(angle) * distance;
-          entryZ = dayZ + Math.sin(angle) * distance;
+        // Check and resolve global collision
+        [entryX, entryZ] = nudgeUntilClear(entryX, entryZ, entryRandom);
 
-          attempts++;
-
-          // Check if too close to any already-placed entry in this cluster
-          const tooClose = placedPositions.some(([px, pz]) => {
-            const dx = entryX - px;
-            const dz = entryZ - pz;
-            return Math.sqrt(dx * dx + dz * dz) < CONFIG.minEntrySpacing;
-          });
-
-          if (!tooClose || attempts >= maxAttempts) {
-            break;
-          }
-        } while (true);
-
-        placedPositions.push([entryX, entryZ]);
+        allPlacedPositions.push([entryX, entryZ]);
         positions.set(entry.id, [entryX, 0, entryZ]);
       }
     }

@@ -17,6 +17,7 @@ export interface FlowerDNA {
   leafSize: number;
   leafOrientation: number;
   leafAngle: number;
+  rotation: number;  // Y-axis rotation in radians (0 to 2π)
 }
 
 export interface DecayDNA {

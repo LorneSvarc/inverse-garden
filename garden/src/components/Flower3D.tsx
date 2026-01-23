@@ -99,11 +99,13 @@ const StemLeaf: React.FC<{
 const Flower3D: React.FC<Flower3DProps> = ({ dna, position = [0, 0, 0], onPetalClick }) => {
   const groupRef = useRef<THREE.Group>(null!);
 
+  // Stem curve: base at Y=0 (ground level), flower head at Y=3
+  // This keeps the stem above ground instead of buried
   const stemCurve = useMemo(() => {
     return new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, -3.0, 0),
-      new THREE.Vector3(dna.stemBend * 2, -1.5, 0),
-      new THREE.Vector3(0, 0, 0)
+      new THREE.Vector3(0, 0, 0),                           // Base at ground level
+      new THREE.Vector3(dna.stemBend * 2, 1.5, 0),          // Mid-point with bend
+      new THREE.Vector3(0, 3.0, 0)                          // Top where flower head sits
     ]);
   }, [dna.stemBend]);
 
@@ -165,7 +167,8 @@ const Flower3D: React.FC<Flower3DProps> = ({ dna, position = [0, 0, 0], onPetalC
 
   return (
     <group position={position}>
-      <group ref={groupRef} scale={[dna.scale, dna.scale, dna.scale]} position={[0, 0.5, 0]}>
+      {/* Apply Y-axis rotation to the entire flower for variety */}
+      <group ref={groupRef} scale={[dna.scale, dna.scale, dna.scale]} rotation={[0, dna.rotation, 0]}>
         {/* Stem */}
         <mesh>
           <tubeGeometry args={[stemCurve, 20, 0.08, 8, false]} />
@@ -199,29 +202,31 @@ const Flower3D: React.FC<Flower3DProps> = ({ dna, position = [0, 0, 0], onPetalC
           );
         })}
 
-        {/* Petals */}
-        {petals.map((p, i) => (
-          <Petal
-            key={`${p.index}-${dna.name}`}
-            angle={p.angle}
-            row={p.row}
-            dna={dna}
-            color={dna.petalColors[i % dna.petalColors.length]}
-            index={p.index}
-            onClick={() => onPetalClick?.(p.index)}
-          />
-        ))}
+        {/* Petals - positioned at top of stem (Y=3) */}
+        <group position={[0, 3.0, 0]}>
+          {petals.map((p, i) => (
+            <Petal
+              key={`${p.index}-${dna.name}`}
+              angle={p.angle}
+              row={p.row}
+              dna={dna}
+              color={dna.petalColors[i % dna.petalColors.length]}
+              index={p.index}
+              onClick={() => onPetalClick?.(p.index)}
+            />
+          ))}
 
-        {/* Center / Pistil */}
-        <mesh position={[0, 0.2, 0]}>
-          <sphereGeometry args={[0.4 * (dna.petalWidth / 2), 32, 32]} />
-          <meshStandardMaterial
-            color={dna.centerColor}
-            emissive={dna.centerColor}
-            emissiveIntensity={dna.glowIntensity}
-          />
-          <Sparkles count={20} scale={1} size={2} speed={dna.wobbleSpeed} color={dna.centerColor} />
-        </mesh>
+          {/* Center / Pistil */}
+          <mesh position={[0, 0.2, 0]}>
+            <sphereGeometry args={[0.4 * (dna.petalWidth / 2), 32, 32]} />
+            <meshStandardMaterial
+              color={dna.centerColor}
+              emissive={dna.centerColor}
+              emissiveIntensity={dna.glowIntensity}
+            />
+            <Sparkles count={20} scale={1} size={2} speed={dna.wobbleSpeed} color={dna.centerColor} />
+          </mesh>
+        </group>
       </group>
     </group>
   );
