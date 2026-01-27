@@ -1,5 +1,4 @@
 import type {
-  MoodEntry,
   MoodEntryWithPercentile,
   PlantType,
   PlantDNA,

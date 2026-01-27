@@ -4,13 +4,16 @@ import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { MoodEntryWithPercentile, PlantDNA } from './types';
 import { parseCSVWithPercentiles } from './utils/csvParser';
-import { entryToDNA } from './utils/dnaMapper';
+import { entryToDNA, getPlantType } from './utils/dnaMapper';
 import { calculatePositions, getLayoutConfig } from './utils/positionCalculator';
-import Flower3D from './components/Flower3D';
-import Sprout3D from './components/Sprout3D';
-import Decay3D from './components/Decay3D';
+import { calculateGardenLevel } from './utils/gardenLevel';
+import { calculateFadeState, type FadeState } from './utils/plantFading';
+import CleanToonFlower3D from './components/CleanToonFlower3D';
+import CleanToonSprout3D from './components/CleanToonSprout3D';
+import CleanToonDecay3D from './components/CleanToonDecay3D';
 import TimelineControls from './components/TimelineControls';
 import TestScene from './components/TestScene';
+import AtmospherePlayground from './components/AtmospherePlayground';
 import './App.css';
 
 /**
@@ -22,16 +25,33 @@ function isTestMode(): boolean {
 }
 
 /**
+ * Check if playground mode is enabled via URL path
+ */
+function isPlaygroundMode(): boolean {
+  return window.location.pathname === '/playground';
+}
+
+/**
  * Plant component that renders the appropriate 3D component based on DNA type
  */
-function Plant({ plantDNA, position }: { plantDNA: PlantDNA; position: [number, number, number] }) {
+function Plant({
+  plantDNA,
+  position,
+  opacity,
+  saturation
+}: {
+  plantDNA: PlantDNA;
+  position: [number, number, number];
+  opacity: number;
+  saturation: number;
+}) {
   switch (plantDNA.type) {
     case 'flower':
-      return <Flower3D dna={plantDNA.dna} position={position} />;
+      return <CleanToonFlower3D dna={plantDNA.dna} position={position} opacity={opacity} saturation={saturation} />;
     case 'sprout':
-      return <Sprout3D dna={plantDNA.dna} position={position} />;
+      return <CleanToonSprout3D dna={plantDNA.dna} position={position} opacity={opacity} saturation={saturation} />;
     case 'decay':
-      return <Decay3D dna={plantDNA.dna} position={position} />;
+      return <CleanToonDecay3D dna={plantDNA.dna} position={position} opacity={opacity} saturation={saturation} />;
   }
 }
 
@@ -87,9 +107,12 @@ function getTimeBounds(entries: MoodEntryWithPercentile[]): { earliest: Date; la
 }
 
 function App() {
-  // Check for test mode
+  // Check for special modes
   if (isTestMode()) {
     return <TestScene />;
+  }
+  if (isPlaygroundMode()) {
+    return <AtmospherePlayground />;
   }
 
   // All entries from the CSV (sorted by timestamp)
@@ -180,12 +203,38 @@ function App() {
     return () => clearInterval(interval);
   }, [isPlaying, playbackSpeed, timeBounds, currentTime]);
 
-  // Filter entries that are visible at current time
-  // A plant is visible if currentTime >= entry.timestamp
-  const visibleEntries = useMemo(() => {
+  // Calculate garden level at current time
+  const gardenLevel = useMemo(() => {
+    if (!currentTime) return 0;
+    return calculateGardenLevel(allEntries, currentTime);
+  }, [allEntries, currentTime]);
+
+  // Filter entries that have been created by current time
+  // (they may still be visible even if fading)
+  const createdEntries = useMemo(() => {
     if (!currentTime) return [];
     return allEntries.filter(entry => entry.timestamp <= currentTime);
   }, [allEntries, currentTime]);
+
+  // Calculate fade state for each created entry
+  const fadeStates = useMemo(() => {
+    if (!currentTime) return new Map<string, FadeState>();
+    const states = new Map<string, FadeState>();
+    for (const entry of createdEntries) {
+      const plantType = getPlantType(entry.valenceClassification);
+      const fadeState = calculateFadeState(entry, plantType, currentTime, gardenLevel);
+      states.set(entry.id, fadeState);
+    }
+    return states;
+  }, [createdEntries, currentTime, gardenLevel]);
+
+  // Filter to only entries that are still visible (opacity > 0)
+  const visibleEntries = useMemo(() => {
+    return createdEntries.filter(entry => {
+      const fadeState = fadeStates.get(entry.id);
+      return fadeState?.isVisible ?? false;
+    });
+  }, [createdEntries, fadeStates]);
 
   // Convert visible entries to DNA (memoized for performance)
   const visiblePlants = useMemo(() => {
@@ -225,6 +274,17 @@ function App() {
 
   return (
     <div className="app">
+      {/* Garden Level Display (dev UI) */}
+      <div className="garden-level-display">
+        <span className="label">Garden Level:</span>
+        <span className={`value ${gardenLevel < 0 ? 'lush' : gardenLevel > 0 ? 'barren' : 'neutral'}`}>
+          {gardenLevel.toFixed(2)}
+        </span>
+        <span className="indicator">
+          {gardenLevel < -0.5 ? '🌸 Lush' : gardenLevel > 0.5 ? '🍂 Barren' : '⚖️ Balanced'}
+        </span>
+      </div>
+
       {/* Collapsible info panel */}
       <div className={`info-panel ${panelOpen ? 'open' : 'collapsed'}`}>
         <div className="panel-header" onClick={() => setPanelOpen(!panelOpen)}>
@@ -233,7 +293,7 @@ function App() {
         </div>
         {panelOpen && (
           <div className="panel-content">
-            <p>Showing {visiblePlants.length} of {allEntries.length} entries</p>
+            <p>Showing {visiblePlants.length} of {allEntries.length} entries (created: {createdEntries.length})</p>
             <ul>
               {visibleEntries.slice(-10).reverse().map((entry, i) => (
                 <li key={entry.id}>
@@ -280,13 +340,19 @@ function App() {
         <Lighting />
         <Ground />
 
-        {visiblePlants.map((plantDNA, index) => (
-          <Plant
-            key={visibleEntries[index].id}
-            plantDNA={plantDNA}
-            position={getPosition(visibleEntries[index].id)}
-          />
-        ))}
+        {visiblePlants.map((plantDNA, index) => {
+          const entry = visibleEntries[index];
+          const fadeState = fadeStates.get(entry.id) ?? { opacity: 1, saturation: 1, isVisible: true };
+          return (
+            <Plant
+              key={entry.id}
+              plantDNA={plantDNA}
+              position={getPosition(entry.id)}
+              opacity={fadeState.opacity}
+              saturation={fadeState.saturation}
+            />
+          );
+        })}
 
         <OrbitControls
           enablePan={true}

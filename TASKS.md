@@ -168,31 +168,89 @@ Three-level positioning system:
 
 ## Phase 2B: Garden Level & Fading
 
-- [ ] Garden level calculation
+### Detailed Design (Agreed 2025-01-23)
+
+**Fading System Overview:**
+Plants fade over time through two channels: saturation and opacity.
+- **Saturation** fades faster than opacity: vibrant → grey → ghost → gone
+- **No grace period**: Plants begin fading immediately upon creation, but slowly at first
+- **Accelerating curve**: Fading speeds up over time (not linear)
+- **At 0 opacity**: Plant disappears (not rendered)
+- **Timeline scrubbing**: Shows proper fade/unfade states based on time position
+
+**Garden Level:**
+- Cumulative emotional state that affects environment and fade rates
+- Negative entries (flowers) add to garden level
+- Positive entries (decays) subtract from garden level
+- Decays toward zero over time (exponential decay)
+- Negative garden level = "lush" (flowers thrive)
+- Positive garden level = "barren" (decays thrive)
+
+**Two Fade Modifiers:**
+
+1. **Intensity Modifier** (per-plant, based on |valence|):
+   - Higher |valence| = plant fades slower (lasts longer)
+   - A -0.9 flower fades slower than a -0.2 flower
+   - A +0.9 decay fades slower than a +0.2 decay
+   - Sprouts use the same logic (|valence| = 0, so baseline fade)
+
+2. **Garden Level Modifier** (environmental, affects all plants):
+   - Negative garden level → ALL flowers fade slower
+   - Positive garden level → ALL decays fade slower
+   - "Matching" means: flowers match negative periods, decays match positive periods
+   - Plants only fade down, never get brighter
+
+### Implementation Checklist ✅ COMPLETE
+
+- [x] Garden level calculation
   - Negative valence adds to garden level (toward lush)
   - Positive valence subtracts from garden level (toward barren)
-  - Use exponential decay so recent entries matter most
+  - Exponential decay toward zero (half-life: 7 days)
   - **Implementation:** `garden/src/utils/gardenLevel.ts`
-- [ ] Plant fading over time (opacity + desaturation)
+- [x] Plant fading over time (opacity + desaturation)
   - Base lifespan: 14 days (tunable)
-  - Opacity: 1.0 → 0.0
-  - Saturation: 1.0 → 0.3 (fade slower than opacity)
+  - Saturation fades faster: 1.0 → 0.0 before opacity reaches 0
+  - Opacity: 1.0 → 0.0 (accelerating curve, not linear)
   - **Implementation:** `garden/src/utils/plantFading.ts`
-- [ ] Garden level affects fading rates
-  - Matching plants fade slower (flowers during negative periods)
-  - Mismatched plants fade faster (flowers during positive periods)
-  - Modifier: ±50% fade rate adjustment
-- [ ] Modify plant components to accept opacity/saturation props
-- [ ] Define and tune parameters:
+- [x] Intensity modifier (per-plant)
+  - Higher |valence| = slower fade rate
+  - Applied per plant based on its own intensity
+- [x] Garden level modifier (environmental)
+  - Negative garden level → flowers fade slower
+  - Positive garden level → decays fade slower
+  - Modifier strength: ±50% fade rate adjustment
+- [x] Modify plant components to accept opacity/saturation props
+  - Flower3D, Sprout3D, Decay3D all need updates
+  - Use transparent materials with opacity
+  - Apply saturation adjustment to colors
+- [x] Add garden level dev UI display
+  - Show current garden level value
+  - Useful for tuning parameters
+- [x] Define and tune parameters:
   - Base plant lifespan (start: 14 days)
   - Garden level half-life (start: 7 days)
-  - Fade modifier strength (start: ±50%)
+  - Intensity modifier strength
+  - Garden level modifier strength (start: ±50%)
+  - Saturation fade curve (faster than opacity)
+  - Opacity fade curve (accelerating)
 
-**Success criteria:** Scrubbing through time shows garden evolving with persistence mechanics.
+**Completed:** 2025-01-23
+
+**Success criteria:** Scrubbing through time shows garden evolving with persistence mechanics. Plants fade from vibrant to grey to ghost to gone. Garden level visibly affects which plant types persist.
+
+### Parameters to Fine-Tune Later
+- Base lifespan (14 days may be too short/long for the data range)
+- Garden level half-life (7 days - affects how quickly environment responds)
+- Fade curve exponent (2.0 - affects how fast acceleration feels)
+- Saturation fade speed (1.5x - affects grey-out timing relative to transparency)
+- Garden level modifier strength (±50% - how much environment affects persistence)
+- Intensity modifier strength (+50% - how much valence affects individual plant lifespan)
 
 ---
 
-## Phase 3: Spatial Layout
+## Phase 3: Spatial Layout ⏸️ DEFERRED
+
+**Status:** Skipping for now - Phase 2.5 already established spiral+scatter positioning. Full spatial layout refinement deferred until other features are complete.
 
 - [ ] Determine garden plot size
 - [ ] Position plants with natural distribution
@@ -201,9 +259,35 @@ Three-level positioning system:
 
 **Success criteria:** Garden looks like a garden, not a pile.
 
+**Why deferred:** Spatial layout will be a significant undertaking. Better to have lighting, atmosphere, and other visual systems working first, then refine positioning with full context.
+
 ---
 
-## Phase 4: Polish & Atmosphere
+## Phase 4: Polish & Atmosphere 🔄 IN PROGRESS
+
+### Phase 4A: Atmosphere Playground
+
+**Spec Document:** `inverse-garden-atmosphere-spec.md`
+
+Before implementing the full lighting system, we need to explore and validate the visual approach through a playground at `/playground` route.
+
+**Two-Layer Lighting System:**
+1. **Layer 1: Time-Based (The Sun)** — Position/intensity from entry timestamps
+2. **Layer 2: Emotional (The Grade)** — Post-processing color/exposure from garden level
+
+- [ ] Create `/playground` route with atmosphere controls
+- [ ] Implement sun positioning based on time of day
+- [ ] Implement color grading (temperature shift) based on garden level
+- [ ] Implement exposure modifier based on garden level
+- [ ] Add fog system (density, color, distance)
+- [ ] Add bloom post-processing
+- [ ] Add flower emissive controls
+- [ ] Add preset buttons (Negative Noon, Positive Noon, Negative Night, Positive Night)
+- [ ] Test and validate parameters
+
+**Implementation:** `garden/src/components/AtmospherePlayground.tsx`
+
+### Phase 4B: Full Atmosphere Integration (After Playground Validation)
 
 - [ ] Daily Mood lighting system
   - Negative Daily Mood → warm, bright, golden hour
@@ -308,3 +392,111 @@ cd garden && npx tsc --noEmit
   - Nudges colliding positions outward until clear
 - **Coordinate System:** Unified Y=0 as ground level across all plant types
   - Updated Sprout3D and Decay3D to match new ground level
+
+### 2025-01-23 - Phase 2B Complete
+- **Garden Level System:** `garden/src/utils/gardenLevel.ts`
+  - Calculates cumulative emotional state at any point in time
+  - Negative entries add (toward lush), positive entries subtract (toward barren)
+  - Exponential decay toward zero (half-life: 7 days)
+  - Returns fade rate modifier per plant type
+- **Plant Fading System:** `garden/src/utils/plantFading.ts`
+  - Two-channel fading: saturation (faster) and opacity (slower)
+  - Accelerating fade curve (slow start, fast end)
+  - Intensity modifier: higher |valence| = longer lifespan
+  - Garden level modifier: matching environment = slower fade
+  - Color saturation adjustment utility function
+- **Plant Component Updates:**
+  - Flower3D, Sprout3D, Decay3D now accept opacity/saturation props
+  - All materials use transparent mode with proper opacity
+  - Colors adjusted for saturation in real-time
+- **App Integration:**
+  - Garden level calculated at current timeline position
+  - Fade state calculated for all plants
+  - Fully faded plants (opacity = 0) are not rendered
+  - Garden level dev UI in top-right corner
+- **Parameters (Tunable):**
+  - Base lifespan: 14 days
+  - Garden level half-life: 7 days
+  - Intensity modifier: +50% lifespan at max |valence|
+  - Garden level modifier: ±50% fade rate
+  - Saturation fades 1.5x faster than opacity
+  - Fade curve exponent: 2.0 (quadratic acceleration)
+- **Bug Fix:** Corrected garden level sign - negative entries now correctly push garden level negative (lush)
+
+### 2025-01-23 - Phase 4A: Atmosphere Playground
+- **New Route:** `/playground` - Visual playground for testing atmosphere parameters
+- **Two-Layer Lighting System:**
+  - Layer 1 (Sun): Position/intensity calculated from time of day (6am sunrise → 6pm sunset arc)
+  - Layer 2 (Emotional Grade): Color temperature, exposure modifier based on garden level
+- **Dynamic Lighting:**
+  - DirectionalLight as sun with position based on hour
+  - HemisphereLight for sky/ground ambient fill
+  - AmbientLight for base fill
+  - All lights respond to exposure modifier
+- **Fog System:**
+  - Configurable near/far distances
+  - Warmth control (cool blue-grey ↔ warm amber-brown)
+  - Scene background matches fog color
+- **Post-Processing:**
+  - Bloom with intensity and threshold controls
+  - Vignette with intensity control
+  - Tone mapping exposure via gl settings
+- **Control Panel:**
+  - Collapsible UI with all atmosphere parameters
+  - Sun controls: time override, intensity, warmth
+  - Emotional atmosphere: garden level override, color temperature, exposure
+  - Fog controls: enable, near/far distance, warmth
+  - Bloom/Vignette controls
+  - Ambient light controls
+  - Flower emissive boost (placeholder for future implementation)
+- **Presets:**
+  - "Negative Noon" - bright + warm + vivid
+  - "Positive Noon" - bright + cool + muted
+  - "Negative Night" - dark + warm + glowing
+  - "Positive Night" - dark + cool + empty
+  - "Reset" - return to defaults
+- **Implementation:** `garden/src/components/AtmospherePlayground.tsx` + CSS
+- **Dependencies Added:** `@react-three/postprocessing`
+
+### 2025-01-26 - Rendering Style Exploration & Integration
+
+**Rendering Mode Exploration in Playground:**
+- Added 4 rendering modes to compare visual styles:
+  - **Normal:** Original components with MeshWobbleMaterial, emissive, sparkles
+  - **Toon:** Cel-shaded with meshToonMaterial (lost data encoding on sprouts/decays)
+  - **Clean:** Simplified meshStandardMaterial, no effects, WITH full data encoding
+  - **Clean Toon:** Cel-shaded + full data encoding (best of both worlds)
+
+**Clean Toon Components Created:**
+- `CleanToonFlower3D.tsx` - Cel-shaded flower, subtle petal animation
+- `CleanToonSprout3D.tsx` - Cel-shaded sprout WITH restored bud stripes (secondary/tertiary emotion encoding)
+- `CleanToonDecay3D.tsx` - Cel-shaded decay WITH restored cracks (association color encoding)
+- `utils/toonGradient.ts` - Shared 4-step gradient texture for toon materials
+
+**Decision: Clean Toon chosen as main scene style**
+- Toon shading provides softer shadows and cohesive visual language
+- Data encoding preserved (stripes on sprouts, cracks on decays)
+- No distracting visual noise (wobble, sparkles, emissive glow)
+
+**Main Scene Updated:**
+- `App.tsx` now imports and uses CleanToon* components instead of original Flower3D/Sprout3D/Decay3D
+- Original components preserved as fallbacks
+
+**Preserved Files (not modified):**
+- `Flower3D.tsx`, `Sprout3D.tsx`, `Decay3D.tsx` - original components
+- `CleanFlower3D.tsx`, `CleanSprout3D.tsx`, `CleanDecay3D.tsx` - meshStandardMaterial versions
+
+### 2025-01-26 - Decay Visual Design Experiment (In Progress)
+
+**Goal:** Make decays feel like "barren patches" — places where something should have grown but couldn't — rather than abstract graphic discs.
+
+**Experiment: Barren Patch Mode**
+Adding toggle in AtmospherePlayground to compare current decay style with experimental "barren patch" treatment:
+
+1. Position slightly below ground plane (y = -0.05) — slight depression
+2. Desaturate layer colors by ~50% — "stained/depleted earth" not vibrant rings
+3. Amplify edgeWobble effect — visible irregularity in boundary
+4. Amplify crackWobble effect — organic variation in cracks
+5. Make cracks cast shadows — subtle grooves catching light
+
+Data encoding preserved: 3 emotion colors (layers), 3 association colors (cracks), size from valence

@@ -1,0 +1,252 @@
+/* ============================================
+   ATMOSPHERE PLAYGROUND
+   ============================================ */
+
+.atmosphere-playground {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+/* Loading and error states */
+.atmosphere-playground .loading,
+.atmosphere-playground .error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  background: #1a1a2e;
+  color: white;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 18px;
+}
+
+.atmosphere-playground .error {
+  color: #ef4444;
+}
+
+/* ============================================
+   CONTROL PANEL
+   ============================================ */
+
+.atmosphere-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  border-radius: 8px;
+  max-width: 320px;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  max-height: calc(100vh - 40px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.atmosphere-panel.collapsed {
+  max-width: 200px;
+}
+
+.atmosphere-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #333;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.atmosphere-panel.collapsed .panel-header {
+  border-bottom: none;
+}
+
+.atmosphere-panel .panel-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.atmosphere-panel .panel-header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.atmosphere-panel .panel-header .toggle {
+  font-size: 20px;
+  color: #888;
+  font-weight: bold;
+  width: 24px;
+  text-align: center;
+}
+
+.atmosphere-panel .panel-content {
+  padding: 12px 16px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Status Section */
+.status-section {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.status-row .lush {
+  color: #4ade80;
+}
+
+.status-row .barren {
+  color: #f97316;
+}
+
+/* Control Sections */
+.control-section {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #333;
+}
+
+.control-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.control-section h3 {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Slider Labels */
+.control-section label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.control-section label > span:first-child {
+  flex: 0 0 60px;
+  color: #aaa;
+}
+
+.control-section label > input[type='range'] {
+  flex: 1;
+  min-width: 80px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: #444;
+  border-radius: 2px;
+  outline: none;
+}
+
+.control-section label > input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.control-section label > input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.control-section label > span:last-child {
+  flex: 0 0 40px;
+  text-align: right;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* Checkbox Labels */
+.checkbox-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.checkbox-label input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #4ade80;
+}
+
+.checkbox-label span {
+  flex: none !important;
+  color: #fff !important;
+}
+
+/* Preset Buttons */
+.preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-buttons button {
+  padding: 6px 10px;
+  background: #333;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.preset-buttons button:hover {
+  background: #444;
+  border-color: #666;
+}
+
+.preset-buttons button:active {
+  transform: scale(0.95);
+}
+
+/* Scrollbar styling */
+.atmosphere-panel .panel-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.atmosphere-panel .panel-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.atmosphere-panel .panel-content::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+.atmosphere-panel .panel-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

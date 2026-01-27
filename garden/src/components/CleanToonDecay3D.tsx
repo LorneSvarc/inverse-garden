@@ -2,8 +2,9 @@ import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import type { DecayDNA } from '../types';
 import { adjustColorSaturation } from '../utils/plantFading';
+import { getToonGradient } from '../utils/toonGradient';
 
-interface Decay3DProps {
+interface CleanToonDecay3DProps {
   dna: DecayDNA;
   position?: [number, number, number];
   opacity?: number;
@@ -11,12 +12,19 @@ interface Decay3DProps {
 }
 
 /**
- * Decay3D - Renders a procedurally generated ground decay scar based on DNA
+ * CleanToonDecay3D - Cel-shaded decay with toon material
  *
- * Modified from reference: removed ground plane and scene lights
- * since multiple decays will share a single scene.
+ * Uses meshToonMaterial for soft cel-shaded look.
+ * RESTORED: Cracks for association color encoding.
+ * All geometry/structure identical to original Decay3D.
  */
-const Decay3D: React.FC<Decay3DProps> = ({ dna, position = [0, 0, 0], opacity = 1, saturation = 1 }) => {
+const CleanToonDecay3D: React.FC<CleanToonDecay3DProps> = ({
+  dna,
+  position = [0, 0, 0],
+  opacity = 1,
+  saturation = 1
+}) => {
+  const gradientMap = useMemo(() => getToonGradient(), []);
 
   // Apply saturation to layer colors
   const adjustedLayer1Color = useMemo(
@@ -95,7 +103,8 @@ const Decay3D: React.FC<Decay3DProps> = ({ dna, position = [0, 0, 0], opacity = 
   }, [dna.size, dna.edgeWobble, dna.aspectRatio]);
 
   /**
-   * Creates radiating cracks from center outward.
+   * RESTORED: Creates radiating cracks from center outward.
+   * These encode association colors from the mood entry.
    */
   const cracks = useMemo(() => {
     const crackList: {
@@ -202,10 +211,9 @@ const Decay3D: React.FC<Decay3DProps> = ({ dna, position = [0, 0, 0], opacity = 
 
         {/* Layer 3 - Outermost/Bottom */}
         <mesh position={[0, 0, layer3Height]} geometry={layer3Geometry}>
-          <meshStandardMaterial
+          <meshToonMaterial
             color={adjustedLayer3Color}
-            roughness={0.85}
-            metalness={0.05}
+            gradientMap={gradientMap}
             transparent
             opacity={opacity}
           />
@@ -213,10 +221,9 @@ const Decay3D: React.FC<Decay3DProps> = ({ dna, position = [0, 0, 0], opacity = 
 
         {/* Layer 2 - Middle */}
         <mesh position={[0, 0, layer2Height]} geometry={layer2Geometry}>
-          <meshStandardMaterial
+          <meshToonMaterial
             color={adjustedLayer2Color}
-            roughness={0.8}
-            metalness={0.08}
+            gradientMap={gradientMap}
             transparent
             opacity={opacity}
           />
@@ -224,26 +231,24 @@ const Decay3D: React.FC<Decay3DProps> = ({ dna, position = [0, 0, 0], opacity = 
 
         {/* Layer 1 - Innermost/Top */}
         <mesh position={[0, 0, layer1Height]} geometry={layer1Geometry}>
-          <meshStandardMaterial
+          <meshToonMaterial
             color={adjustedLayer1Color}
-            roughness={0.75}
-            metalness={0.1}
+            gradientMap={gradientMap}
             transparent
             opacity={opacity}
           />
         </mesh>
 
-        {/* Cracks */}
+        {/* RESTORED: Cracks (these encode association colors) */}
         {cracks.map((crack, idx) => (
           <mesh
             key={`crack-${idx}`}
             position={[0, 0, crackHeight]}
             geometry={crack.geometry}
           >
-            <meshStandardMaterial
+            <meshToonMaterial
               color={getCrackColor(crack.colorIndex)}
-              roughness={0.7}
-              metalness={0.15}
+              gradientMap={gradientMap}
               transparent
               opacity={opacity}
             />
@@ -255,4 +260,4 @@ const Decay3D: React.FC<Decay3DProps> = ({ dna, position = [0, 0, 0], opacity = 
   );
 };
 
-export default Decay3D;
+export default CleanToonDecay3D;

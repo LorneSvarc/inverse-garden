@@ -1,39 +1,38 @@
 import React, { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { MeshWobbleMaterial, Sparkles } from '@react-three/drei';
 import * as THREE from 'three';
 import type { FlowerDNA } from '../types';
 import { adjustColorSaturation } from '../utils/plantFading';
+import { getToonGradient } from '../utils/toonGradient';
 
-interface Flower3DProps {
+interface CleanToonFlower3DProps {
   dna: FlowerDNA;
   position?: [number, number, number];
-  onPetalClick?: (index: number) => void;
   opacity?: number;
   saturation?: number;
 }
 
-const Petal: React.FC<{
+/**
+ * ToonPetal - Cel-shaded petal with subtle animation
+ */
+const ToonPetal: React.FC<{
   angle: number;
   row: number;
   dna: FlowerDNA;
   color: string;
-  index: number;
-  onClick?: () => void;
   opacity: number;
   saturation: number;
-}> = ({ angle, row, dna, color, onClick, opacity, saturation }) => {
+}> = ({ angle, row, dna, color, opacity, saturation }) => {
   const meshRef = useRef<THREE.Mesh>(null!);
+  const gradientMap = useMemo(() => getToonGradient(), []);
 
   const petalShape = useMemo(() => {
     const shape = new THREE.Shape();
     const w = dna.petalWidth / 2;
     const l = dna.petalLength;
-
     shape.moveTo(0, 0);
     shape.bezierCurveTo(w, l * 0.3, w, l * 0.8, 0, l);
     shape.bezierCurveTo(-w, l * 0.8, -w, l * 0.3, 0, 0);
-
     return new THREE.ExtrudeGeometry(shape, {
       depth: 0.1,
       bevelEnabled: true,
@@ -43,34 +42,21 @@ const Petal: React.FC<{
     });
   }, [dna.petalWidth, dna.petalLength]);
 
-  // Apply saturation adjustment to color
   const adjustedColor = useMemo(() => adjustColorSaturation(color, saturation), [color, saturation]);
 
+  // Subtle petal animation
   useFrame((state) => {
     if (!meshRef.current) return;
-    const t = state.clock.getElapsedTime() * dna.wobbleSpeed;
-    meshRef.current.rotation.x = (Math.PI / 4) + (row * 0.2) + Math.sin(t + angle) * 0.1 * dna.petalCurvature;
+    const t = state.clock.getElapsedTime() * dna.wobbleSpeed * 0.5;
+    meshRef.current.rotation.x = (Math.PI / 4) + (row * 0.2) + Math.sin(t + angle) * 0.05 * dna.petalCurvature;
   });
 
   return (
     <group rotation={[0, angle, 0]} position={[0, row * 0.15, 0]}>
-      <mesh
-        ref={meshRef}
-        geometry={petalShape}
-        castShadow
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick?.();
-        }}
-      >
-        <MeshWobbleMaterial
+      <mesh ref={meshRef} geometry={petalShape} castShadow>
+        <meshToonMaterial
           color={adjustedColor}
-          speed={dna.wobbleSpeed}
-          factor={0.15}
-          emissive={adjustedColor}
-          emissiveIntensity={dna.glowIntensity * 0.3 * opacity}
-          roughness={0.1}
-          metalness={0.5}
+          gradientMap={gradientMap}
           transparent
           opacity={opacity}
         />
@@ -79,15 +65,19 @@ const Petal: React.FC<{
   );
 };
 
-const StemLeaf: React.FC<{
+/**
+ * ToonStemLeaf - Cel-shaded stem leaf
+ */
+const ToonStemLeaf: React.FC<{
   position: THREE.Vector3;
   rotation: THREE.Euler;
   scale: number;
-  dna: FlowerDNA;
   color: string;
   opacity: number;
   saturation: number;
 }> = ({ position, rotation, scale, color, opacity, saturation }) => {
+  const gradientMap = useMemo(() => getToonGradient(), []);
+
   const shape = useMemo(() => {
     const s = new THREE.Shape();
     s.moveTo(0, 0);
@@ -100,27 +90,32 @@ const StemLeaf: React.FC<{
 
   return (
     <mesh position={position} rotation={rotation} geometry={shape} scale={[scale, scale, scale]} castShadow>
-      <meshStandardMaterial color={adjustedColor} side={THREE.DoubleSide} transparent opacity={opacity} />
+      <meshToonMaterial
+        color={adjustedColor}
+        gradientMap={gradientMap}
+        side={THREE.DoubleSide}
+        transparent
+        opacity={opacity}
+      />
     </mesh>
   );
 };
 
 /**
- * Flower3D - Renders a procedurally generated flower based on DNA
+ * CleanToonFlower3D - Cel-shaded flower with toon material
  *
- * Modified from reference: removed ground plane and scene lights
- * since multiple flowers will share a single scene.
+ * Uses meshToonMaterial for soft cel-shaded look.
+ * No MeshWobbleMaterial, no Sparkles, no emissive.
+ * Keeps subtle petal animation.
  */
-const Flower3D: React.FC<Flower3DProps> = ({
+const CleanToonFlower3D: React.FC<CleanToonFlower3DProps> = ({
   dna,
   position = [0, 0, 0],
-  onPetalClick,
   opacity = 1,
   saturation = 1
 }) => {
-  const groupRef = useRef<THREE.Group>(null!);
+  const gradientMap = useMemo(() => getToonGradient(), []);
 
-  // Apply saturation to stem and center colors
   const adjustedStemColor = useMemo(
     () => adjustColorSaturation(dna.stemColors[0], saturation),
     [dna.stemColors, saturation]
@@ -131,17 +126,16 @@ const Flower3D: React.FC<Flower3DProps> = ({
   );
 
   // Stem curve: base at Y=0 (ground level), flower head at Y=3
-  // This keeps the stem above ground instead of buried
   const stemCurve = useMemo(() => {
     return new THREE.CatmullRomCurve3([
-      new THREE.Vector3(0, 0, 0),                           // Base at ground level
-      new THREE.Vector3(dna.stemBend * 2, 1.5, 0),          // Mid-point with bend
-      new THREE.Vector3(0, 3.0, 0)                          // Top where flower head sits
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(dna.stemBend * 2, 1.5, 0),
+      new THREE.Vector3(0, 3.0, 0)
     ]);
   }, [dna.stemBend]);
 
   const leaves = useMemo(() => {
-    const items: { position: THREE.Vector3; rotation: THREE.Euler; index: number; scale: number }[] = [];
+    const items: { position: THREE.Vector3; rotation: THREE.Euler; index: number; scale: number; color: string }[] = [];
     if (!dna.leafCount) return items;
 
     const positions = [0.4, 0.6, 0.8];
@@ -173,15 +167,26 @@ const Flower3D: React.FC<Flower3DProps> = ({
       const leafMatrix = new THREE.Matrix4().makeBasis(rotationAxis, finalDirection, new THREE.Vector3().crossVectors(rotationAxis, finalDirection));
       const finalRot = new THREE.Euler().setFromRotationMatrix(leafMatrix);
 
+      // Leaf colors based on association count
+      let leafColor: string;
+      if (dna.stemColors.length === 1) {
+        leafColor = dna.stemColors[0];
+      } else if (dna.stemColors.length === 2) {
+        leafColor = dna.stemColors[1];
+      } else {
+        leafColor = dna.stemColors[Math.min(i + 1, dna.stemColors.length - 1)];
+      }
+
       items.push({
         position: point,
         rotation: finalRot,
         index: i,
-        scale: dna.leafSize || 1.0
+        scale: dna.leafSize || 1.0,
+        color: leafColor
       });
     }
     return items;
-  }, [dna.leafCount, dna.leafSize, dna.leafOrientation, dna.leafAngle, stemCurve]);
+  }, [dna.leafCount, dna.leafSize, dna.leafOrientation, dna.leafAngle, dna.stemColors, stemCurve]);
 
   const petals = useMemo(() => {
     const items = [];
@@ -198,54 +203,40 @@ const Flower3D: React.FC<Flower3DProps> = ({
 
   return (
     <group position={position}>
-      {/* Apply Y-axis rotation to the entire flower for variety */}
-      <group ref={groupRef} scale={[dna.scale, dna.scale, dna.scale]} rotation={[0, dna.rotation, 0]}>
+      <group scale={[dna.scale, dna.scale, dna.scale]} rotation={[0, dna.rotation, 0]}>
         {/* Stem */}
         <mesh castShadow>
           <tubeGeometry args={[stemCurve, 20, 0.08, 8, false]} />
-          <meshStandardMaterial color={adjustedStemColor} transparent opacity={opacity} />
+          <meshToonMaterial
+            color={adjustedStemColor}
+            gradientMap={gradientMap}
+            transparent
+            opacity={opacity}
+          />
         </mesh>
 
         {/* Leaves on Stem */}
-        {leaves.map((leaf, i) => {
-          // GDD spec for association → leaf colors:
-          // 1 association: all leaves = that color
-          // 2 associations: all leaves = secondary color
-          // 3 associations: leaf 1 = secondary, leaf 2 = tertiary
-          let leafColor: string;
-          if (dna.stemColors.length === 1) {
-            leafColor = dna.stemColors[0];
-          } else if (dna.stemColors.length === 2) {
-            leafColor = dna.stemColors[1]; // All leaves use secondary
-          } else {
-            // 3+ associations: leaf index 0 gets secondary, leaf index 1 gets tertiary
-            leafColor = dna.stemColors[Math.min(i + 1, dna.stemColors.length - 1)];
-          }
-          return (
-            <StemLeaf
-              key={i}
-              position={leaf.position}
-              rotation={leaf.rotation}
-              scale={leaf.scale}
-              dna={dna}
-              color={leafColor}
-              opacity={opacity}
-              saturation={saturation}
-            />
-          );
-        })}
+        {leaves.map((leaf, i) => (
+          <ToonStemLeaf
+            key={i}
+            position={leaf.position}
+            rotation={leaf.rotation}
+            scale={leaf.scale}
+            color={leaf.color}
+            opacity={opacity}
+            saturation={saturation}
+          />
+        ))}
 
         {/* Petals - positioned at top of stem (Y=3) */}
         <group position={[0, 3.0, 0]}>
           {petals.map((p, i) => (
-            <Petal
+            <ToonPetal
               key={`${p.index}-${dna.name}`}
               angle={p.angle}
               row={p.row}
               dna={dna}
               color={dna.petalColors[i % dna.petalColors.length]}
-              index={p.index}
-              onClick={() => onPetalClick?.(p.index)}
               opacity={opacity}
               saturation={saturation}
             />
@@ -254,14 +245,12 @@ const Flower3D: React.FC<Flower3DProps> = ({
           {/* Center / Pistil */}
           <mesh position={[0, 0.2, 0]} castShadow>
             <sphereGeometry args={[0.4 * (dna.petalWidth / 2), 32, 32]} />
-            <meshStandardMaterial
+            <meshToonMaterial
               color={adjustedCenterColor}
-              emissive={adjustedCenterColor}
-              emissiveIntensity={dna.glowIntensity * opacity}
+              gradientMap={gradientMap}
               transparent
               opacity={opacity}
             />
-            <Sparkles count={20} scale={1} size={2} speed={dna.wobbleSpeed} color={adjustedCenterColor} opacity={opacity} />
           </mesh>
         </group>
       </group>
@@ -269,4 +258,4 @@ const Flower3D: React.FC<Flower3DProps> = ({
   );
 };
 
-export default Flower3D;
+export default CleanToonFlower3D;
