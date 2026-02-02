@@ -14,6 +14,8 @@ import CleanToonDecay3D from './components/CleanToonDecay3D';
 import TimelineControls from './components/TimelineControls';
 import TestScene from './components/TestScene';
 import AtmospherePlayground from './components/AtmospherePlayground';
+import EnvironmentTest from './components/EnvironmentTest';
+import ExhibitTest from './components/ExhibitTest';
 import './App.css';
 
 /**
@@ -22,6 +24,22 @@ import './App.css';
 function isTestMode(): boolean {
   const params = new URLSearchParams(window.location.search);
   return params.get('test') === 'true';
+}
+
+/**
+ * Check if environment test mode is enabled via URL parameter
+ */
+function isEnvironmentTestMode(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('test') === 'environment';
+}
+
+/**
+ * Check if exhibit test mode is enabled via URL parameter
+ */
+function isExhibitTestMode(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('test') === 'exhibit';
 }
 
 /**
@@ -110,6 +128,12 @@ function App() {
   // Check for special modes
   if (isTestMode()) {
     return <TestScene />;
+  }
+  if (isEnvironmentTestMode()) {
+    return <EnvironmentTest />;
+  }
+  if (isExhibitTestMode()) {
+    return <ExhibitTest />;
   }
   if (isPlaygroundMode()) {
     return <AtmospherePlayground />;

@@ -500,3 +500,36 @@ Adding toggle in AtmospherePlayground to compare current decay style with experi
 5. Make cracks cast shadows — subtle grooves catching light
 
 Data encoding preserved: 3 emotion colors (layers), 3 association colors (cracks), size from valence
+
+### 2025-02-02 - Lighting & Shadows Investigation (REVISIT NEEDED)
+
+**Problem:** Attempted to add controllable shadow parameters to EnvironmentTest.tsx. Shadows work but controls are limited.
+
+**What Works:**
+- Shadows Enabled checkbox - toggles shadow casting
+- Sun Intensity slider - changes scene brightness
+- Time of Day slider - moves sun position and shadow direction
+
+**What Doesn't Work (and why):**
+- **Shadow Softness slider** - `shadow.radius` only works with VSMShadowMap, not PCFSoftShadowMap. VSM has visual artifacts (light bleeding), so we reverted to PCFSoftShadowMap.
+- **Shadow darkness** - Shadow maps are binary. Ambient light raises overall brightness but doesn't change shadow contrast.
+- **Shadow length at dawn/dusk** - Physically accurate but extreme. Could clamp minimum sun elevation.
+
+**Material Compatibility Issue:**
+- `meshToonMaterial` uses discrete banding that interferes with smooth shadow appearance
+- DirtSurface changed to `meshLambertMaterial` to receive shadows properly
+- The "harsh shadows" on the dirt are actually working shadow maps, not toon banding
+
+**Current State:**
+- Canvas uses `THREE.PCFSoftShadowMap` (stable, no artifacts, but no softness control)
+- Shadow Softness slider exists but does nothing with current shadow map type
+- DirtSurface: meshLambertMaterial with receiveShadow
+- RaisedBed: meshToonMaterial, no castShadow/receiveShadow
+- Flowers: castShadow on all geometry
+
+**Options to Explore Later:**
+1. Baked shadows (static, high quality)
+2. Custom shader combining toon shading with controllable shadow overlay
+3. Accept toon-style hard shadows as part of aesthetic
+4. drei's `softShadows` helper (untested)
+5. Clamp sun elevation to prevent extreme shadow lengths
