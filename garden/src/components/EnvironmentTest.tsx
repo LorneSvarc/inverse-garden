@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { FlowerDNA } from '../types';
 import { CAMERA_LIMITS } from '../config/environmentConfig';
 import { getToonGradient } from '../utils/toonGradient';
 import CleanToonFlower3D from './CleanToonFlower3D';
+import AnimatedToonFlower3D from './AnimatedToonFlower3D';
 import { RaisedBed } from './RaisedBed';
 import { DirtSurface } from './DirtSurface';
 
@@ -300,7 +301,86 @@ function BackWall({ useToonMaterial, sunColor }: { useToonMaterial: boolean; sun
 }
 
 // =============================================================================
-// HARDCODED TEST FLOWERS
+// ANIMATION TEST FLOWERS - Just 3 flowers, positioned for good visibility
+// =============================================================================
+
+const ANIMATION_TEST_FLOWERS: { dna: FlowerDNA; position: [number, number, number] }[] = [
+  {
+    position: [0, 0, 5],  // Center front - main focus
+    dna: {
+      name: 'Animation Test 1',
+      description: 'Main test flower',
+      petalCount: 8,
+      petalRows: 2,
+      petalLength: 1.2,
+      petalWidth: 0.8,
+      petalCurvature: 0.5,
+      petalColors: ['#e63946', '#f4a261', '#e63946', '#f4a261', '#e63946', '#f4a261', '#e63946', '#f4a261'],
+      centerColor: '#ffbe0b',
+      stemColors: ['#2d6a4f', '#40916c'],
+      glowIntensity: 0.1,
+      wobbleSpeed: 0.8,
+      scale: 1.2,
+      stemBend: 0.2,
+      leafCount: 2,
+      leafSize: 1.0,
+      leafOrientation: 45,
+      leafAngle: 0.5,
+      rotation: 0,
+    },
+  },
+  {
+    position: [-4, 0, 2],  // Left
+    dna: {
+      name: 'Animation Test 2',
+      description: 'Left flower',
+      petalCount: 6,
+      petalRows: 2,
+      petalLength: 1.0,
+      petalWidth: 0.9,
+      petalCurvature: 0.6,
+      petalColors: ['#7209b7', '#3a0ca3', '#4361ee', '#7209b7', '#3a0ca3', '#4361ee'],
+      centerColor: '#f72585',
+      stemColors: ['#2d6a4f'],
+      glowIntensity: 0.1,
+      wobbleSpeed: 0.6,
+      scale: 1.0,
+      stemBend: -0.15,
+      leafCount: 2,
+      leafSize: 0.9,
+      leafOrientation: 0,
+      leafAngle: 0.4,
+      rotation: 0.5,
+    },
+  },
+  {
+    position: [4, 0, 2],  // Right
+    dna: {
+      name: 'Animation Test 3',
+      description: 'Right flower',
+      petalCount: 10,
+      petalRows: 2,
+      petalLength: 0.9,
+      petalWidth: 0.7,
+      petalCurvature: 0.4,
+      petalColors: ['#ffbe0b', '#fb5607', '#ffbe0b', '#fb5607', '#ffbe0b', '#fb5607', '#ffbe0b', '#fb5607', '#ffbe0b', '#fb5607'],
+      centerColor: '#3a0ca3',
+      stemColors: ['#40916c', '#52b788'],
+      glowIntensity: 0.1,
+      wobbleSpeed: 0.7,
+      scale: 1.0,
+      stemBend: 0.25,
+      leafCount: 3,
+      leafSize: 1.0,
+      leafOrientation: 30,
+      leafAngle: 0.5,
+      rotation: -0.3,
+    },
+  },
+];
+
+// =============================================================================
+// HARDCODED TEST FLOWERS (full set)
 // =============================================================================
 
 const TEST_FLOWERS: { dna: FlowerDNA; position: [number, number, number] }[] = [
@@ -543,6 +623,7 @@ export default function EnvironmentTest() {
   const [panelOpen, setPanelOpen] = useState(true);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [lightingOpen, setLightingOpen] = useState(false);
+  const [animationOpen, setAnimationOpen] = useState(true);
 
   // Camera limit state - starting from current CAMERA_LIMITS values
   const [minDistance, setMinDistance] = useState(CAMERA_LIMITS.minDistance);
@@ -563,6 +644,13 @@ export default function EnvironmentTest() {
   const [shadowRadius, setShadowRadius] = useState(2);
   const [shadowBias, setShadowBias] = useState(-0.0001);
 
+  // Animation controls
+  const [growthProgress, setGrowthProgress] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [animationSpeed, setAnimationSpeed] = useState(1.0);
+  const [useAnimatedFlowers, setUseAnimatedFlowers] = useState(true);
+  const [useTestFlowers, setUseTestFlowers] = useState(true); // true = 3 test flowers, false = full set
+
   const sunPosition = useMemo(() => getSunPosition(hour, sunDistance), [hour, sunDistance]);
   const { intensity: baseIntensity, color: sunColor } = useMemo(
     () => getSunIntensityAndColor(hour),
@@ -572,6 +660,36 @@ export default function EnvironmentTest() {
 
   // Format radians as degrees for display
   const toDeg = (rad: number) => `${(rad * 180 / Math.PI).toFixed(0)}°`;
+
+  // Animation playback loop
+  useEffect(() => {
+    if (!isPlaying) return;
+
+    let animationFrameId: number;
+    let lastTime = performance.now();
+
+    const animate = (currentTime: number) => {
+      const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+      lastTime = currentTime;
+
+      setGrowthProgress((prev) => {
+        const newProgress = prev + deltaTime * animationSpeed * 0.5; // 0.5 = full animation in 2 seconds at speed 1
+        if (newProgress >= 1) {
+          setIsPlaying(false);
+          return 1;
+        }
+        return newProgress;
+      });
+
+      animationFrameId = requestAnimationFrame(animate);
+    };
+
+    animationFrameId = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [isPlaying, animationSpeed]);
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', background: '#000' }}>
@@ -827,6 +945,107 @@ export default function EnvironmentTest() {
                 </div>
               )}
             </div>
+
+            {/* Animation Controls */}
+            <div style={{ marginTop: '12px', borderTop: '1px solid #333', paddingTop: '8px' }}>
+              <div
+                style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                onClick={() => setAnimationOpen(!animationOpen)}
+              >
+                <span style={{ fontSize: '13px', fontWeight: 'bold' }}>Animation</span>
+                <span>{animationOpen ? '−' : '+'}</span>
+              </div>
+
+              {animationOpen && (
+                <div style={{ marginTop: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', cursor: 'pointer', marginBottom: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={useAnimatedFlowers}
+                      onChange={(e) => setUseAnimatedFlowers(e.target.checked)}
+                    />
+                    <span>Use Animated Flowers</span>
+                  </label>
+
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', cursor: 'pointer', marginBottom: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={useTestFlowers}
+                      onChange={(e) => setUseTestFlowers(e.target.checked)}
+                    />
+                    <span>Animation Test (3 flowers)</span>
+                  </label>
+
+                  <CameraSlider
+                    label="Growth Progress"
+                    value={growthProgress}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onChange={(v) => {
+                      setGrowthProgress(v);
+                      setIsPlaying(false);
+                    }}
+                    displayValue={`${(growthProgress * 100).toFixed(0)}%`}
+                  />
+
+                  <CameraSlider
+                    label="Animation Speed"
+                    value={animationSpeed}
+                    min={0.1}
+                    max={3.0}
+                    step={0.1}
+                    onChange={setAnimationSpeed}
+                    displayValue={`${animationSpeed.toFixed(1)}x`}
+                  />
+
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                    <button
+                      style={{
+                        flex: 1,
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        background: isPlaying ? '#555' : '#4a9',
+                        border: 'none',
+                        borderRadius: '4px',
+                        color: '#fff',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => {
+                        if (growthProgress >= 1) setGrowthProgress(0);
+                        setIsPlaying(!isPlaying);
+                      }}
+                    >
+                      {isPlaying ? 'Pause' : 'Play'}
+                    </button>
+                    <button
+                      style={{
+                        flex: 1,
+                        padding: '6px 8px',
+                        fontSize: '11px',
+                        background: '#333',
+                        border: '1px solid #555',
+                        borderRadius: '4px',
+                        color: '#fff',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => {
+                        setGrowthProgress(0);
+                        setIsPlaying(false);
+                      }}
+                    >
+                      Reset
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: '12px', fontSize: '10px', color: '#888', lineHeight: '1.4' }}>
+                    <div>Stem: 0-50% (overlapping)</div>
+                    <div>Leaves: 25-70% (overlapping)</div>
+                    <div>Bloom: 60-100% (overlapping)</div>
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
@@ -864,15 +1083,30 @@ export default function EnvironmentTest() {
         <RaisedBed />
         <DirtSurface />
 
-        {/* Test flowers */}
-        {TEST_FLOWERS.map((flower, i) => (
-          <CleanToonFlower3D
-            key={i}
-            dna={flower.dna}
-            position={flower.position}
-            saturation={1}
-          />
-        ))}
+        {/* Test flowers - animated or static based on toggle */}
+        {(() => {
+          const flowers = useTestFlowers ? ANIMATION_TEST_FLOWERS : TEST_FLOWERS;
+          return useAnimatedFlowers ? (
+            flowers.map((flower, i) => (
+              <AnimatedToonFlower3D
+                key={`animated-${i}`}
+                dna={flower.dna}
+                position={flower.position}
+                saturation={1}
+                growthProgress={growthProgress}
+              />
+            ))
+          ) : (
+            flowers.map((flower, i) => (
+              <CleanToonFlower3D
+                key={`static-${i}`}
+                dna={flower.dna}
+                position={flower.position}
+                saturation={1}
+              />
+            ))
+          );
+        })()}
 
         {/* Camera controls */}
         <OrbitControls

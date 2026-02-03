@@ -533,3 +533,35 @@ Data encoding preserved: 3 emotion colors (layers), 3 association colors (cracks
 3. Accept toon-style hard shadows as part of aesthetic
 4. drei's `softShadows` helper (untested)
 5. Clamp sun elevation to prevent extreme shadow lengths
+
+### 2025-02-02 - Flower Growth Animation ✅ COMPLETE
+
+**Spec Document:** `inverse-garden-animation-brief.md`
+
+**Implementation:** `garden/src/components/AnimatedToonFlower3D.tsx`
+
+Created procedural flower growth animation with overlapping phases:
+
+**Phase Timing (overlapping for organic feel):**
+- Stem: 0% - 55% of growth progress
+- Leaves: 20% - 55% (starts while stem is still growing)
+- Bloom: 35% - 100% (starts while leaves are still growing)
+
+**Animation Features:**
+- **Stem Growth:** Emerges from below ground, uses easeOutQuad for gradual growth
+- **Leaves:** All leaves grow together using the same phase progress
+- **Petals:** Staggered radial appearance - each petal starts at a different time, creating a blooming effect
+- **Center/Pistil:** Grows linearly with bloom phase
+
+**Test Scene:** `EnvironmentTest.tsx` (`?test=environment` URL param)
+- Animation controls panel with Growth Progress slider
+- Play/Pause and Reset buttons
+- Animation speed control (default 1.7x works best)
+- Toggle between animated and static flowers
+- Toggle between 3 test flowers and full set
+
+**Key Technical Decisions:**
+- Used `growthProgress > threshold` for visibility instead of phase progress to ensure correct timing
+- Linear scaling for petals (no easing) provides smooth, visible growth
+- Petal stagger: each petal takes 0.5 of bloom phase to fully open, staggered over first 0.5 of bloom phase
+- Removed elastic easing which caused instant jumps
