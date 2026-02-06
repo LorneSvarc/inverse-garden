@@ -18,7 +18,7 @@ import { getToonGradient } from '../utils/toonGradient';
 
 // Color palette from design plan
 const COLORS = {
-  floorVoid: '#0a0808',      // Near-black, absorbs light
+  floorVoid: '#5a4a3d',      // Warm brown floor
   excavationLip: '#3d2817',  // Dark earth at edge
   soilBase: '#4a3520',       // Warm brown, desaturated
   soilHighlight: '#5c4632',  // Lighter patches
@@ -84,63 +84,136 @@ function smoothNoise(x: number, y: number, seed: number): number {
 }
 
 /**
- * Floor plane - the dark void surrounding the excavation
+ * Floor plane - everything OUTSIDE the excavation (has a HOLE for the bed)
+ * Large organic ellipse with emissive glow
+ *
+ * GLOW responds to mood:
+ * - Negative: Sweet yellow-orange glow
+ * - Neutral: Dim warm neutral light
+ * - Positive: Dark musty grey-blue
  */
-const FloorVoid: React.FC = () => {
+const FloorVoid: React.FC<{ moodValence: number }> = ({ moodValence }) => {
   const gradientMap = useMemo(() => getToonGradient(), []);
 
+  // Base color - dark so emissive glow is the main color
+  const floorColor = useMemo(() => {
+    return new THREE.Color('#222018');
+  }, []);
+
+  // Emissive color IS the visible floor color - strong saturation
+  const emissiveColor = useMemo(() => {
+    if (moodValence < 0) {
+      // Negative: sweet yellow-orange glow
+      const t = Math.abs(moodValence);
+      const neutral = new THREE.Color('#996633');  // Warm amber
+      const warm = new THREE.Color('#ff9922');     // Sweet yellow-orange
+      return neutral.clone().lerp(warm, t);
+    } else {
+      // Positive: musty dark blue
+      const t = moodValence;
+      const neutral = new THREE.Color('#996633');  // Warm amber
+      const cool = new THREE.Color('#334466');     // Musty dark blue
+      return neutral.clone().lerp(cool, t);
+    }
+  }, [moodValence]);
+
+  // Emissive intensity - this IS the floor visibility
+  const emissiveIntensity = useMemo(() => {
+    // Constant intensity so floor is always visible
+    // Slightly brighter for negative (warm glow)
+    if (moodValence < 0) {
+      return 0.5 + Math.abs(moodValence) * 0.2;
+    } else {
+      return 0.5;
+    }
+  }, [moodValence]);
+
+  const geometry = useMemo(() => {
+    // Outer shape: large organic ellipse
+    const outerPoints = generateOrganicShape(
+      80, 70,   // Large ellipse
+      0.05,     // Subtle wobble
+      64,       // Smooth curve
+      123       // Different seed from excavation
+    );
+
+    // Inner hole: matches the excavation edge outer boundary
+    const holePoints = generateOrganicShape(
+      GROUND_BOUNDS.width + 2,  // Same as excavation edge outer
+      GROUND_BOUNDS.depth + 2,
+      0.08,
+      64,
+      42  // Same seed as excavation for alignment
+    );
+
+    // Create shape with hole
+    const outerShape = new THREE.Shape(outerPoints);
+    const holePath = new THREE.Path(holePoints);
+    outerShape.holes.push(holePath);
+
+    const geo = new THREE.ShapeGeometry(outerShape, 48);
+    geo.rotateX(-Math.PI / 2);
+
+    return geo;
+  }, []);
+
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-      <planeGeometry args={[100, 100]} />
+    <mesh geometry={geometry} position={[0, -0.01, 0]} receiveShadow>
       <meshToonMaterial
-        color={COLORS.floorVoid}
+        color={floorColor}
+        emissive={emissiveColor}
+        emissiveIntensity={emissiveIntensity}
         gradientMap={gradientMap}
+        toneMapped={false}
       />
     </mesh>
   );
 };
 
 /**
- * Excavation edge - beveled transition from floor to soil
+ * BedWall - Raised wall around the bed edge
+ * Extrudes UPWARD from ground level to create a lip around the soil
  */
-const ExcavationEdge: React.FC = () => {
+const BedWall: React.FC = () => {
   const gradientMap = useMemo(() => getToonGradient(), []);
 
   const geometry = useMemo(() => {
-    // Generate organic outline
+    // Outer edge: matches floor hole
     const outerPoints = generateOrganicShape(
-      GROUND_BOUNDS.width + 2,  // Slightly larger than soil
+      GROUND_BOUNDS.width + 2,
       GROUND_BOUNDS.depth + 2,
-      0.08,  // Subtle wobble
-      64,    // Smooth curve
-      42     // Seed for consistency
+      0.08,
+      64,
+      42
     );
 
+    // Inner edge: matches soil
     const innerPoints = generateOrganicShape(
       GROUND_BOUNDS.width - 0.5,
       GROUND_BOUNDS.depth - 0.5,
       0.08,
       64,
-      42  // Same seed so shapes align
+      42
     );
 
-    // Create shape with hole
+    // Create ring shape
     const outerShape = new THREE.Shape(outerPoints);
     const innerPath = new THREE.Path(innerPoints);
     outerShape.holes.push(innerPath);
 
-    // Extrude downward to create the bevel
+    // Extrude UPWARD to create the raised wall
     const extrudeSettings = {
-      depth: 1.5,  // Depth of excavation edge
+      depth: 1.2,  // Wall height
       bevelEnabled: true,
-      bevelThickness: 0.3,
-      bevelSize: 0.3,
-      bevelSegments: 3,
+      bevelThickness: 0.2,
+      bevelSize: 0.2,
+      bevelSegments: 2,
     };
 
     const geo = new THREE.ExtrudeGeometry(outerShape, extrudeSettings);
 
     // Rotate to horizontal (shape is in XY, we want XZ)
+    // After rotation, extrusion goes in -Y direction, so we position it to go up
     geo.rotateX(-Math.PI / 2);
 
     return geo;
@@ -159,12 +232,11 @@ const ExcavationEdge: React.FC = () => {
 
 /**
  * Soil surface - the bottom of the excavation where plants grow
+ * Static brown with texture variation - NO mood response
  */
 const SoilSurface: React.FC = () => {
-  const gradientMap = useMemo(() => getToonGradient(), []);
-
+  // Create geometry with static brown vertex colors (no mood response)
   const geometry = useMemo(() => {
-    // Generate organic soil shape (matches inner edge of excavation)
     const points = generateOrganicShape(
       GROUND_BOUNDS.width - 0.5,
       GROUND_BOUNDS.depth - 0.5,
@@ -175,70 +247,70 @@ const SoilSurface: React.FC = () => {
 
     const shape = new THREE.Shape(points);
     const geo = new THREE.ShapeGeometry(shape, 32);
-
-    // Rotate to horizontal
     geo.rotateX(-Math.PI / 2);
 
-    // Apply procedural soil colors via vertex colors
+    // Add vertex colors - static brown palette with texture variation
     const count = geo.attributes.position.count;
-    const colorArray = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
 
-    const color1 = new THREE.Color(COLORS.soilBase);
-    const color2 = new THREE.Color(COLORS.soilHighlight);
-    const color3 = new THREE.Color(COLORS.excavationLip);
+    // Static brown palette
+    const soilColors = [
+      new THREE.Color('#4a3520'),
+      new THREE.Color('#5a4530'),
+      new THREE.Color('#6a5540'),
+    ];
 
     for (let i = 0; i < count; i++) {
       const x = geo.attributes.position.getX(i);
       const z = geo.attributes.position.getZ(i);
 
-      // Multi-octave noise for natural patches
-      const n1 = smoothNoise(x * 0.15, z * 0.15, 123);
-      const n2 = smoothNoise(x * 0.4, z * 0.4, 456) * 0.3;
-      const n = Math.min(1, Math.max(0, n1 + n2));
+      // Noise for patches
+      const n = smoothNoise(x * 0.3, z * 0.3, 42);
 
-      // Blend between soil colors
-      const c = new THREE.Color();
+      // Pick color from palette based on noise
+      let finalColor: THREE.Color;
       if (n < 0.4) {
-        c.lerpColors(color3, color1, n / 0.4);
-      } else if (n < 0.7) {
-        c.lerpColors(color1, color2, (n - 0.4) / 0.3);
+        finalColor = new THREE.Color().lerpColors(soilColors[0], soilColors[1], n / 0.4);
       } else {
-        c.copy(color2);
+        finalColor = new THREE.Color().lerpColors(soilColors[1], soilColors[2], (n - 0.4) / 0.6);
       }
 
-      colorArray[i * 3] = c.r;
-      colorArray[i * 3 + 1] = c.g;
-      colorArray[i * 3 + 2] = c.b;
+      colors[i * 3] = finalColor.r;
+      colors[i * 3 + 1] = finalColor.g;
+      colors[i * 3 + 2] = finalColor.b;
     }
 
-    geo.setAttribute('color', new THREE.BufferAttribute(colorArray, 3));
-
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     return geo;
-  }, []);
+  }, []); // Static - no dependencies
 
   return (
     <mesh
       geometry={geometry}
-      position={[0, -1.5, 0]}  // At bottom of excavation
+      position={[0, 0, 0]}  // At ground level where plants are
       receiveShadow
     >
-      <meshToonMaterial
-        vertexColors
-        gradientMap={gradientMap}
-      />
+      <meshLambertMaterial vertexColors />
     </mesh>
   );
 };
 
+interface ExcavatedBedProps {
+  moodValence?: number;
+}
+
 /**
  * Main ExcavatedBed component
  * Composes floor, edge, and soil into a unified ground system
+ * Floor and soil both respond to mood (wet vs dry)
  */
-export const ExcavatedBed: React.FC = () => {
+export const ExcavatedBed: React.FC<ExcavatedBedProps> = ({
+  moodValence = 0,
+}) => {
   return (
     <group>
-      <FloorVoid />
-      <ExcavationEdge />
+      <FloorVoid moodValence={moodValence} />
+      <BedWall />
       <SoilSurface />
     </group>
   );

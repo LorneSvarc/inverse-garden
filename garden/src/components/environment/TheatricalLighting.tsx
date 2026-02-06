@@ -150,10 +150,10 @@ export const TheatricalLighting: React.FC<TheatricalLightingProps> = ({
 }) => {
   const keyLightRef = useRef<THREE.DirectionalLight>(null);
 
+  // Lighting based on time ONLY (no mood modifier)
   const lighting = useMemo(() => {
-    const base = getTimeBasedLighting(hour);
-    return applyMoodModifier(base, moodValence);
-  }, [hour, moodValence]);
+    return getTimeBasedLighting(hour);
+  }, [hour]);
 
   // DYNAMIC sun position - shadows follow the sun arc at fixed Z=-60
   const sunPosition = useMemo(() => getSunPosition(hour), [hour]);

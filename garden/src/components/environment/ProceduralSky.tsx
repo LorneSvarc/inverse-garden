@@ -174,18 +174,12 @@ const skyFragmentShader = `
 
 export const ProceduralSky: React.FC<ProceduralSkyProps> = ({
   hour,
-  moodValence,
+  moodValence: _moodValence,  // Kept for interface compatibility but not used
 }) => {
-  // Calculate colors based on time and mood
+  // Calculate colors based on time ONLY (no mood adjustment)
   const { zenith, horizon } = useMemo(() => {
-    const baseColors = getTimeColors(hour);
-
-    // Apply mood adjustment
-    return {
-      zenith: applyMoodAdjustment(baseColors.zenith, moodValence),
-      horizon: applyMoodAdjustment(baseColors.horizon, moodValence),
-    };
-  }, [hour, moodValence]);
+    return getTimeColors(hour);
+  }, [hour]);
 
   // Create shader material
   const material = useMemo(() => {

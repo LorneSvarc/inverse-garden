@@ -240,6 +240,7 @@ export default function VitrineTest() {
   const [vignetteStrength, setVignetteStrength] = useState(0.3);
   const [fogDensity, setFogDensity] = useState(0.008);
   const [godRaysEnabled, setGodRaysEnabled] = useState(true);
+  const [cloudsEnabled, setCloudsEnabled] = useState(true);
 
   // Sun mesh reference for god rays
   const [sunMesh, setSunMesh] = useState<THREE.Mesh | null>(null);
@@ -347,6 +348,14 @@ export default function VitrineTest() {
                 />
                 <span>God Rays (for radiant days)</span>
               </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer', marginTop: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={cloudsEnabled}
+                  onChange={(e) => setCloudsEnabled(e.target.checked)}
+                />
+                <span>Clouds (appear with positive mood)</span>
+              </label>
             </div>
 
             {/* Post-Processing Controls */}
@@ -415,6 +424,7 @@ export default function VitrineTest() {
           valenceText={valenceText}
           shadowsEnabled={shadowsEnabled}
           fogDensity={fogDensity}
+          cloudsEnabled={cloudsEnabled}
           onSunMeshReady={handleSunMeshReady}
         />
 

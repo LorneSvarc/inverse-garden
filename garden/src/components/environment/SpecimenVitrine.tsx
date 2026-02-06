@@ -1,13 +1,12 @@
 import React, { useMemo, useRef, useCallback } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { EmissivePerimeter } from './EmissivePerimeter';
 import { ProceduralSky } from './ProceduralSky';
 import { LEDWall } from './LEDWall';
 import { TheatricalLighting } from './TheatricalLighting';
 import { SunMesh } from './SunMesh';
-import { ToonClouds } from './ToonClouds';
 import { ExcavatedBed } from '../ExcavatedBed';
+import { ToonClouds } from './ToonClouds';
 
 /**
  * SpecimenVitrine v9 - The Observation Garden
@@ -50,6 +49,7 @@ interface SpecimenVitrineProps {
   showRim?: boolean;
   shadowsEnabled?: boolean;
   fogDensity?: number;
+  cloudsEnabled?: boolean;
   onSunMeshReady?: (mesh: THREE.Mesh | null) => void;  // Callback to pass sun mesh to parent
 }
 
@@ -59,6 +59,7 @@ export const SpecimenVitrine: React.FC<SpecimenVitrineProps> = ({
   valenceText = 'NEUTRAL',
   shadowsEnabled = true,
   fogDensity: fogDensityProp,
+  cloudsEnabled = true,
   onSunMeshReady,
 }) => {
   const sunRef = useRef<THREE.Mesh>(null);
@@ -111,6 +112,15 @@ export const SpecimenVitrine: React.FC<SpecimenVitrineProps> = ({
       {/* Authored procedural sky - time and mood responsive */}
       <ProceduralSky hour={hour} moodValence={moodValence} />
 
+      {/* Toon clouds - coverage increases with positive mood (overcast) */}
+      {cloudsEnabled && (
+        <ToonClouds
+          moodValence={moodValence}
+          hour={hour}
+          height={28}
+        />
+      )}
+
       {/* Sun mesh - visible for radiant days, source for god rays */}
       <SunMesh
         ref={(mesh) => {
@@ -124,31 +134,16 @@ export const SpecimenVitrine: React.FC<SpecimenVitrineProps> = ({
         distance={60}
       />
 
-      {/* Toon clouds - appear for overcast days (positive mood) */}
-      <ToonClouds
-        moodValence={moodValence}
-        hour={hour}
-        height={28}
-        spread={1.0}
-      />
-
-      {/* ExcavatedBed - organic ground system with beveled edges and procedural soil */}
-      <ExcavatedBed />
-
-      {/* Emissive perimeter ring - spatial definition, follows excavation edge */}
-      <EmissivePerimeter
-        moodValence={moodValence}
-        hour={hour}
-        innerRadius={18}
-        outerRadius={22}
-      />
+      {/* ExcavatedBed - soil inside (no glow), floor outside (subtle glow) */}
+      <ExcavatedBed moodValence={moodValence} />
 
       {/* LED wall - displays the valence text */}
+      {/* Wall center at y=9.5, height=18: bottom at y=0.5, with 1.0 base footer reaching y=-0.5 */}
       <LEDWall
         text={valenceText}
         width={50}
         height={18}
-        position={[0, 12, -30]}
+        position={[0, 10, -30]}
         moodValence={moodValence}
         glowIntensity={2.0}
       />
