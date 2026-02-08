@@ -241,6 +241,8 @@ export default function VitrineTest() {
   const [fogDensity, setFogDensity] = useState(0.008);
   const [godRaysEnabled, setGodRaysEnabled] = useState(true);
   const [cloudsEnabled, setCloudsEnabled] = useState(true);
+  const [wallEmissiveEnabled, setWallEmissiveEnabled] = useState(true);
+  const [wallEmissiveStrength, setWallEmissiveStrength] = useState(1.0);
 
   // Sun mesh reference for god rays
   const [sunMesh, setSunMesh] = useState<THREE.Mesh | null>(null);
@@ -356,6 +358,24 @@ export default function VitrineTest() {
                 />
                 <span>Clouds (appear with positive mood)</span>
               </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', cursor: 'pointer', marginTop: '4px' }}>
+                <input
+                  type="checkbox"
+                  checked={wallEmissiveEnabled}
+                  onChange={(e) => setWallEmissiveEnabled(e.target.checked)}
+                />
+                <span>Wall Emissive (time-based)</span>
+              </label>
+              {wallEmissiveEnabled && (
+                <Slider
+                  label="Wall Strength"
+                  value={wallEmissiveStrength}
+                  min={0}
+                  max={2}
+                  step={0.1}
+                  onChange={setWallEmissiveStrength}
+                />
+              )}
             </div>
 
             {/* Post-Processing Controls */}
@@ -425,6 +445,8 @@ export default function VitrineTest() {
           shadowsEnabled={shadowsEnabled}
           fogDensity={fogDensity}
           cloudsEnabled={cloudsEnabled}
+          wallEmissiveEnabled={wallEmissiveEnabled}
+          wallEmissiveStrength={wallEmissiveStrength}
           onSunMeshReady={handleSunMeshReady}
         />
 

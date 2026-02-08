@@ -21,6 +21,9 @@ interface LEDWallProps {
   glowColor?: string;
   glowIntensity?: number;
   moodValence?: number;
+  hour?: number;  // For time-responsive emissive
+  wallEmissiveEnabled?: boolean;
+  wallEmissiveStrength?: number;
 }
 
 const BRICK_WIDTH = 0.8;
@@ -53,8 +56,11 @@ export const LEDWall: React.FC<LEDWallProps> = ({
   height = 18,
   position = [0, 8, -20],
   glowColor,
-  glowIntensity = 2.0,  // DOUBLED from 1.0
+  glowIntensity = 2.0,
   moodValence = 0,
+  hour = 12,
+  wallEmissiveEnabled = true,
+  wallEmissiveStrength = 1.0,
 }) => {
   const bricksX = Math.floor(width / (BRICK_WIDTH + MORTAR_GAP));
   const bricksY = Math.floor(height / (BRICK_HEIGHT + MORTAR_GAP));
@@ -62,12 +68,16 @@ export const LEDWall: React.FC<LEDWallProps> = ({
   const litBricks = useMemo(() => {
     const pixels = stringToPixels(text);
     const xOffset = centerText(text, bricksX);
-    const yOffset = Math.floor(bricksY * 0.3);
+    // Center text vertically
+    const textHeight = 7; // CHAR_HEIGHT from bitmapFont
+    const yOffset = Math.floor((bricksY - textHeight) / 2);
 
     return new Set(
       pixels.map(([px, py]) => {
         const bx = xOffset + px;
-        const by = yOffset + py;
+        // Flip Y: py=0 is top of character, but brick y=0 is bottom of wall
+        // So we need to invert: top of text (py=0) should map to higher brick Y
+        const by = yOffset + (textHeight - 1 - py);
         return `${bx},${by}`;
       })
     );
@@ -81,6 +91,26 @@ export const LEDWall: React.FC<LEDWallProps> = ({
   const ledIntensity = useMemo(() => {
     return getLEDIntensity(glowIntensity, moodValence);
   }, [glowIntensity, moodValence]);
+
+  // Unlit brick emissive - makes wall visible during day without external light
+  const unlitEmissiveIntensity = useMemo(() => {
+    if (!wallEmissiveEnabled) return 0;
+
+    let baseIntensity: number;
+    // Night: no emissive
+    if (hour < 5 || hour >= 21) baseIntensity = 0;
+    // Dawn/dusk: subtle
+    else if (hour < 7 || hour >= 19) baseIntensity = 0.15;
+    // Day: visible
+    else baseIntensity = 0.25;
+
+    return baseIntensity * wallEmissiveStrength;
+  }, [hour, wallEmissiveEnabled, wallEmissiveStrength]);
+
+  const unlitEmissiveColor = useMemo(() => {
+    if (hour < 7 || hour >= 19) return '#ffddbb';  // Warm golden
+    return '#fffaf5';  // Neutral white
+  }, [hour]);
 
   const seededRandom = (seed: number) => {
     const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
@@ -134,7 +164,7 @@ export const LEDWall: React.FC<LEDWallProps> = ({
         />
       </mesh>
 
-      {/* Unlit bricks - lighter, more visible */}
+      {/* Unlit bricks - time-based emissive for visibility */}
       {unlitBrickPositions.map((brick, i) => (
         <mesh
           key={`unlit-${i}`}
@@ -145,6 +175,8 @@ export const LEDWall: React.FC<LEDWallProps> = ({
           <boxGeometry args={[BRICK_WIDTH, BRICK_HEIGHT, 0.1]} />
           <meshStandardMaterial
             color={COLORS.brick}
+            emissive={unlitEmissiveColor}
+            emissiveIntensity={unlitEmissiveIntensity}
             roughness={0.75}
           />
         </mesh>
@@ -169,16 +201,18 @@ export const LEDWall: React.FC<LEDWallProps> = ({
         </mesh>
       ))}
 
-      {/* Point lights to cast color onto the scene (RectAreaLight not available in drei) */}
+      {/* Point light to cast colored light onto the garden */}
+      {/* Position: forward of wall (z=15 relative = world z=-15), lower to hit ground */}
       {litBrickPositions.length > 0 && (
         <pointLight
-          position={[0, 0, 5]}
+          position={[0, -5, 20]}
           color={ledColor}
-          intensity={ledIntensity * 2}
-          distance={40}
+          intensity={ledIntensity * 4 * Math.PI}
+          distance={60}
           decay={2}
         />
       )}
+
     </group>
   );
 };

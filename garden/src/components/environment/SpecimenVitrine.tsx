@@ -50,6 +50,8 @@ interface SpecimenVitrineProps {
   shadowsEnabled?: boolean;
   fogDensity?: number;
   cloudsEnabled?: boolean;
+  wallEmissiveEnabled?: boolean;
+  wallEmissiveStrength?: number;
   onSunMeshReady?: (mesh: THREE.Mesh | null) => void;  // Callback to pass sun mesh to parent
 }
 
@@ -60,6 +62,8 @@ export const SpecimenVitrine: React.FC<SpecimenVitrineProps> = ({
   shadowsEnabled = true,
   fogDensity: fogDensityProp,
   cloudsEnabled = true,
+  wallEmissiveEnabled = true,
+  wallEmissiveStrength = 1.0,
   onSunMeshReady,
 }) => {
   const sunRef = useRef<THREE.Mesh>(null);
@@ -146,6 +150,9 @@ export const SpecimenVitrine: React.FC<SpecimenVitrineProps> = ({
         position={[0, 10, -30]}
         moodValence={moodValence}
         glowIntensity={2.0}
+        hour={hour}
+        wallEmissiveEnabled={wallEmissiveEnabled}
+        wallEmissiveStrength={wallEmissiveStrength}
       />
 
       {/* Time-of-day lighting */}
