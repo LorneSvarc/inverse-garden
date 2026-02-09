@@ -63,7 +63,7 @@ export default function TimelineControls({
   };
 
   // Speed options
-  const speedOptions = [0.5, 1, 2, 5];
+  const speedOptions = [0.15, 0.25, 0.5, 1, 2];
 
   return (
     <div className="timeline-controls">

@@ -366,7 +366,7 @@ function App() {
 
   // Playback state
   const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1); // days per second
+  const [playbackSpeed, setPlaybackSpeed] = useState(0.25); // days per second
 
   // UI state
   const [loading, setLoading] = useState(true);
@@ -438,11 +438,17 @@ function App() {
 
     const intervalMs = 50; // Update every 50ms for smooth animation
     const msPerDay = 24 * 60 * 60 * 1000;
-    const timeAdvancePerTick = (playbackSpeed * msPerDay * intervalMs) / 1000;
+    const baseAdvance = (playbackSpeed * msPerDay * intervalMs) / 1000;
 
     const interval = setInterval(() => {
       setCurrentTime(prev => {
         if (!prev || !timeBounds) return prev;
+
+        // Fast-forward through night hours (12am-7am) — almost no entries
+        const hour = prev.getHours();
+        const nightMultiplier = (hour >= 0 && hour < 7) ? 6 : 1;
+        const timeAdvancePerTick = baseAdvance * nightMultiplier;
+
         const newTime = new Date(prev.getTime() + timeAdvancePerTick);
 
         // Stop at the end
