@@ -143,6 +143,172 @@ const TEST_FLOWERS: { dna: FlowerDNA; position: [number, number, number] }[] = [
       rotation: 4.0,
     },
   },
+  // Additional flowers to test density
+  {
+    position: [-14, 0, 0],
+    dna: {
+      name: 'Far Left', description: 'Worried', petalCount: 6, petalRows: 2,
+      petalLength: 1.0, petalWidth: 0.7, petalCurvature: 0.5,
+      petalColors: ['#8B5CF6', '#A78BFA', '#8B5CF6', '#A78BFA', '#8B5CF6', '#A78BFA'],
+      centerColor: '#FCD34D', stemColors: ['#6B8E23'], glowIntensity: 0.1,
+      wobbleSpeed: 0.7, scale: 0.9, stemBend: 0.1, leafCount: 2, leafSize: 0.9,
+      leafOrientation: 30, leafAngle: 0.4, rotation: 1.2,
+    },
+  },
+  {
+    position: [14, 0, 2],
+    dna: {
+      name: 'Far Right', description: 'Tense', petalCount: 8, petalRows: 2,
+      petalLength: 0.9, petalWidth: 0.8, petalCurvature: 0.6,
+      petalColors: ['#F97316', '#FB923C', '#F97316', '#FB923C', '#F97316', '#FB923C', '#F97316', '#FB923C'],
+      centerColor: '#7C2D12', stemColors: ['#4ADE80'], glowIntensity: 0.1,
+      wobbleSpeed: 0.65, scale: 1.0, stemBend: -0.1, leafCount: 3, leafSize: 1.0,
+      leafOrientation: -15, leafAngle: 0.5, rotation: 2.5,
+    },
+  },
+  {
+    position: [-4, 0, 12],
+    dna: {
+      name: 'Front Center Left', description: 'Nervous', petalCount: 7, petalRows: 1,
+      petalLength: 1.1, petalWidth: 0.9, petalCurvature: 0.4,
+      petalColors: ['#06B6D4', '#22D3EE', '#06B6D4', '#22D3EE', '#06B6D4', '#22D3EE', '#06B6D4'],
+      centerColor: '#F43F5E', stemColors: ['#84CC16'], glowIntensity: 0.1,
+      wobbleSpeed: 0.8, scale: 1.1, stemBend: 0.15, leafCount: 2, leafSize: 1.1,
+      leafOrientation: 45, leafAngle: 0.45, rotation: 0.8,
+    },
+  },
+  {
+    position: [4, 0, -12],
+    dna: {
+      name: 'Back Center Right', description: 'Fearful', petalCount: 9, petalRows: 2,
+      petalLength: 0.85, petalWidth: 0.75, petalCurvature: 0.55,
+      petalColors: ['#DC2626', '#EF4444', '#DC2626', '#EF4444', '#DC2626', '#EF4444', '#DC2626', '#EF4444', '#DC2626'],
+      centerColor: '#1E3A8A', stemColors: ['#A3E635'], glowIntensity: 0.1,
+      wobbleSpeed: 0.75, scale: 0.85, stemBend: -0.2, leafCount: 2, leafSize: 0.8,
+      leafOrientation: -30, leafAngle: 0.35, rotation: 3.5,
+    },
+  },
+  {
+    position: [-12, 0, -6],
+    dna: {
+      name: 'Left Back Mid', description: 'Dread', petalCount: 5, petalRows: 1,
+      petalLength: 1.2, petalWidth: 1.1, petalCurvature: 0.45,
+      petalColors: ['#7C3AED', '#8B5CF6', '#7C3AED', '#8B5CF6', '#7C3AED'],
+      centerColor: '#FBBF24', stemColors: ['#34D399'], glowIntensity: 0.1,
+      wobbleSpeed: 0.6, scale: 1.15, stemBend: 0.2, leafCount: 1, leafSize: 1.2,
+      leafOrientation: 60, leafAngle: 0.5, rotation: 5.0,
+    },
+  },
+  {
+    position: [10, 0, -10],
+    dna: {
+      name: 'Right Back Corner', description: 'Panic', petalCount: 11, petalRows: 2,
+      petalLength: 0.8, petalWidth: 0.6, petalCurvature: 0.5,
+      petalColors: ['#E11D48', '#F43F5E', '#E11D48', '#F43F5E', '#E11D48', '#F43F5E', '#E11D48', '#F43F5E', '#E11D48', '#F43F5E', '#E11D48'],
+      centerColor: '#0EA5E9', stemColors: ['#22C55E'], glowIntensity: 0.1,
+      wobbleSpeed: 0.9, scale: 0.8, stemBend: 0.05, leafCount: 3, leafSize: 0.7,
+      leafOrientation: 0, leafAngle: 0.4, rotation: 1.8,
+    },
+  },
+  {
+    position: [-8, 0, 8],
+    dna: {
+      name: 'Left Front Mid', description: 'Grief', petalCount: 6, petalRows: 2,
+      petalLength: 1.0, petalWidth: 0.85, petalCurvature: 0.65,
+      petalColors: ['#1D4ED8', '#3B82F6', '#1D4ED8', '#3B82F6', '#1D4ED8', '#3B82F6'],
+      centerColor: '#FEF08A', stemColors: ['#4ADE80'], glowIntensity: 0.1,
+      wobbleSpeed: 0.55, scale: 1.05, stemBend: -0.15, leafCount: 2, leafSize: 1.0,
+      leafOrientation: -45, leafAngle: 0.5, rotation: 2.2,
+    },
+  },
+  {
+    position: [6, 0, 6],
+    dna: {
+      name: 'Right Front Mid', description: 'Lonely', petalCount: 4, petalRows: 1,
+      petalLength: 1.4, petalWidth: 1.2, petalCurvature: 0.4,
+      petalColors: ['#0891B2', '#06B6D4', '#0891B2', '#06B6D4'],
+      centerColor: '#F472B6', stemColors: ['#86EFAC'], glowIntensity: 0.1,
+      wobbleSpeed: 0.7, scale: 1.2, stemBend: 0.1, leafCount: 2, leafSize: 1.1,
+      leafOrientation: 20, leafAngle: 0.45, rotation: 4.5,
+    },
+  },
+  {
+    position: [-2, 0, -6],
+    dna: {
+      name: 'Center Back', description: 'Hopeless', petalCount: 8, petalRows: 2,
+      petalLength: 0.95, petalWidth: 0.8, petalCurvature: 0.5,
+      petalColors: ['#4F46E5', '#6366F1', '#4F46E5', '#6366F1', '#4F46E5', '#6366F1', '#4F46E5', '#6366F1'],
+      centerColor: '#FDE047', stemColors: ['#4ADE80'], glowIntensity: 0.1,
+      wobbleSpeed: 0.65, scale: 0.95, stemBend: -0.1, leafCount: 2, leafSize: 0.9,
+      leafOrientation: 10, leafAngle: 0.4, rotation: 0.3,
+    },
+  },
+  {
+    position: [2, 0, 4],
+    dna: {
+      name: 'Near Center', description: 'Regret', petalCount: 7, petalRows: 1,
+      petalLength: 1.05, petalWidth: 0.9, petalCurvature: 0.55,
+      petalColors: ['#DB2777', '#EC4899', '#DB2777', '#EC4899', '#DB2777', '#EC4899', '#DB2777'],
+      centerColor: '#34D399', stemColors: ['#BEF264'], glowIntensity: 0.1,
+      wobbleSpeed: 0.75, scale: 1.0, stemBend: 0.2, leafCount: 2, leafSize: 1.0,
+      leafOrientation: -25, leafAngle: 0.5, rotation: 3.0,
+    },
+  },
+  {
+    position: [-10, 0, -2],
+    dna: {
+      name: 'Left Mid', description: 'Shame', petalCount: 6, petalRows: 2,
+      petalLength: 1.1, petalWidth: 0.75, petalCurvature: 0.45,
+      petalColors: ['#9333EA', '#A855F7', '#9333EA', '#A855F7', '#9333EA', '#A855F7'],
+      centerColor: '#FCA5A5', stemColors: ['#86EFAC'], glowIntensity: 0.1,
+      wobbleSpeed: 0.8, scale: 0.9, stemBend: -0.05, leafCount: 3, leafSize: 0.85,
+      leafOrientation: 40, leafAngle: 0.35, rotation: 1.5,
+    },
+  },
+  {
+    position: [10, 0, 6],
+    dna: {
+      name: 'Right Mid Front', description: 'Guilt', petalCount: 5, petalRows: 1,
+      petalLength: 1.25, petalWidth: 1.0, petalCurvature: 0.6,
+      petalColors: ['#059669', '#10B981', '#059669', '#10B981', '#059669'],
+      centerColor: '#FDE68A', stemColors: ['#22D3EE'], glowIntensity: 0.1,
+      wobbleSpeed: 0.6, scale: 1.1, stemBend: 0.15, leafCount: 2, leafSize: 1.05,
+      leafOrientation: -10, leafAngle: 0.45, rotation: 5.5,
+    },
+  },
+  {
+    position: [-6, 0, 4],
+    dna: {
+      name: 'Left Center Front', description: 'Despair', petalCount: 9, petalRows: 2,
+      petalLength: 0.9, petalWidth: 0.7, petalCurvature: 0.5,
+      petalColors: ['#0284C7', '#0EA5E9', '#0284C7', '#0EA5E9', '#0284C7', '#0EA5E9', '#0284C7', '#0EA5E9', '#0284C7'],
+      centerColor: '#FCA5A1', stemColors: ['#A3E635'], glowIntensity: 0.1,
+      wobbleSpeed: 0.7, scale: 0.85, stemBend: -0.2, leafCount: 2, leafSize: 0.8,
+      leafOrientation: 55, leafAngle: 0.4, rotation: 2.8,
+    },
+  },
+  {
+    position: [6, 0, -6],
+    dna: {
+      name: 'Right Center Back', description: 'Anguish', petalCount: 8, petalRows: 2,
+      petalLength: 1.0, petalWidth: 0.85, petalCurvature: 0.55,
+      petalColors: ['#C026D3', '#D946EF', '#C026D3', '#D946EF', '#C026D3', '#D946EF', '#C026D3', '#D946EF'],
+      centerColor: '#67E8F9', stemColors: ['#4ADE80'], glowIntensity: 0.1,
+      wobbleSpeed: 0.65, scale: 1.05, stemBend: 0.1, leafCount: 2, leafSize: 0.95,
+      leafOrientation: -35, leafAngle: 0.5, rotation: 4.2,
+    },
+  },
+  {
+    position: [-14, 0, 6],
+    dna: {
+      name: 'Far Left Front', description: 'Melancholy', petalCount: 6, petalRows: 1,
+      petalLength: 1.15, petalWidth: 0.95, petalCurvature: 0.5,
+      petalColors: ['#2563EB', '#3B82F6', '#2563EB', '#3B82F6', '#2563EB', '#3B82F6'],
+      centerColor: '#FBBF24', stemColors: ['#34D399'], glowIntensity: 0.1,
+      wobbleSpeed: 0.75, scale: 1.0, stemBend: -0.1, leafCount: 2, leafSize: 1.0,
+      leafOrientation: 15, leafAngle: 0.45, rotation: 0.6,
+    },
+  },
 ];
 
 const TEST_SPROUT: SproutDNA = {
@@ -243,6 +409,12 @@ export default function VitrineTest() {
   const [cloudsEnabled, setCloudsEnabled] = useState(true);
   const [wallEmissiveEnabled, setWallEmissiveEnabled] = useState(true);
   const [wallEmissiveStrength, setWallEmissiveStrength] = useState(1.0);
+
+  // Camera controls - adjustable to find right values
+  const [camMinDistance, setCamMinDistance] = useState(20);
+  const [camMaxDistance, setCamMaxDistance] = useState(35);  // User preference
+  const [camMinPolar, setCamMinPolar] = useState(0.1);  // multiplied by PI
+  const [camMaxPolar, setCamMaxPolar] = useState(0.43); // User preference
 
   // Sun mesh reference for god rays
   const [sunMesh, setSunMesh] = useState<THREE.Mesh | null>(null);
@@ -416,12 +588,54 @@ export default function VitrineTest() {
               />
             </div>
 
+            {/* Camera Controls */}
+            <div style={{ marginTop: '12px', borderTop: '1px solid #333', paddingTop: '12px' }}>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '8px' }}>Camera Limits</div>
+              <Slider
+                label="Min Distance"
+                value={camMinDistance}
+                min={5}
+                max={50}
+                step={1}
+                onChange={setCamMinDistance}
+              />
+              <Slider
+                label="Max Distance"
+                value={camMaxDistance}
+                min={30}
+                max={150}
+                step={5}
+                onChange={setCamMaxDistance}
+              />
+              <Slider
+                label="Min Polar (×π)"
+                value={camMinPolar}
+                min={0}
+                max={0.5}
+                step={0.01}
+                onChange={setCamMinPolar}
+                displayValue={`${camMinPolar.toFixed(2)}π`}
+              />
+              <Slider
+                label="Max Polar (×π)"
+                value={camMaxPolar}
+                min={0.1}
+                max={0.5}
+                step={0.01}
+                onChange={setCamMaxPolar}
+                displayValue={`${camMaxPolar.toFixed(2)}π`}
+              />
+              <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>
+                Polar: 0 = top-down, 0.5π = horizon
+              </div>
+            </div>
+
             {/* Info */}
             <div style={{ marginTop: '12px', borderTop: '1px solid #333', paddingTop: '12px', fontSize: '10px', color: '#666' }}>
               <div>v8: Full Spectrum Weather + Radiance</div>
               <div>Negative mood = radiant (god rays, warm ring)</div>
               <div>Positive mood = overcast (clouds, dim ring)</div>
-              <div style={{ marginTop: '4px' }}>5 flowers + 1 sprout + 1 decay</div>
+              <div style={{ marginTop: '4px' }}>20 flowers + 1 sprout + 1 decay</div>
             </div>
           </>
         )}
@@ -489,10 +703,10 @@ export default function VitrineTest() {
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
-          minDistance={20}
-          maxDistance={80}
-          minPolarAngle={Math.PI * 0.1}
-          maxPolarAngle={Math.PI * 0.45}
+          minDistance={camMinDistance}
+          maxDistance={camMaxDistance}
+          minPolarAngle={Math.PI * camMinPolar}
+          maxPolarAngle={Math.PI * camMaxPolar}
           target={[0, 2, 0]}
         />
       </Canvas>

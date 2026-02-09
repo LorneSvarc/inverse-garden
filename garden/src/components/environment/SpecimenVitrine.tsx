@@ -121,7 +121,7 @@ export const SpecimenVitrine: React.FC<SpecimenVitrineProps> = ({
         <ToonClouds
           moodValence={moodValence}
           hour={hour}
-          height={28}
+          height={18}
         />
       )}
 

@@ -31,7 +31,7 @@ The "Specimen Vitrine" environment creates a bounded, exhibit-like space:
 | `SpecimenVitrine.tsx` | Main orchestrator | - |
 | `ProceduralSky.tsx` | Gradient sky dome | Time only |
 | `TheatricalLighting.tsx` | Sun arc, shadows | Time only |
-| `ToonClouds.tsx` | Cloud coverage | Mood (toggleable) |
+| `ToonClouds.tsx` | Ghibli-style gradient clouds | Mood (toggleable) |
 | `LEDWall.tsx` | Valence text display | Mood |
 | `SunMesh.tsx` | Visible sun for god rays | Hour, Mood |
 | `PostProcessing.tsx` | Bloom, god rays, vignette | Mood |
@@ -58,6 +58,7 @@ Two distinct areas:
 
 - **Time of Day**: Hour slider (affects lighting direction and color)
 - **Mood Valence**: -1 to +1 (affects floor glow, clouds, god rays)
+- **Camera Limits**: Min/max distance and polar angle controls
 - **Clouds**: Toggle on/off
 - **Shadows**: Toggle on/off
 - **God Rays**: Toggle on/off
@@ -113,6 +114,21 @@ src/
 └── config/
     └── environmentConfig.ts       # Ground bounds, etc.
 ```
+
+## Cloud System (ToonClouds.tsx)
+
+Ghibli-style gradient clouds with dynamic mood response:
+
+| Mood State | Color | Opacity | Scale |
+|------------|-------|---------|-------|
+| Neutral (0) | White/bright | 40% (wispy) | 0.7x (small) |
+| Positive (+1) | Gray/heavy | 100% (dense) | 1.2x (large) |
+
+Features:
+- Top-to-bottom gradient shading (lit tops, shadowed undersides)
+- Time-of-day color variation (dawn, day, dusk, night)
+- Coverage increases with positive mood
+- Slow drift animation
 
 ## Tech Stack
 
