@@ -1,26 +1,25 @@
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
 import { getToonGradient } from '../../utils/toonGradient';
+import { GROUND_BOUNDS } from '../../config/environmentConfig';
 
 /**
- * EmissivePerimeter v9 - Organic Edges (The Observation Garden)
+ * EmissivePerimeter v10 - Elliptical Organic Glow Ring
  *
- * Redesigned to match the organic aesthetic of ExcavatedBed:
- * - Uses same seeded wobble generation for organic edges
- * - Toon shaded material for consistency
- * - Sits on the outer edge of the excavation
+ * Matches the excavation shape (ellipse, not circle):
+ * - Inner edge just outside excavation boundary
+ * - Outer edge creates a glowing ring around the bed
+ * - Uses same seeded wobble as ExcavatedBed for alignment
  *
- * The floor ring MIRRORS the mood expressed in the sky:
- * - Negative mood (radiant sky): Ring glows warm/golden, bright
- * - Neutral: Ring is neutral warm white
- * - Positive mood (overcast sky): Ring dims, goes cool/gray
+ * The ring MIRRORS the mood expressed in the sky:
+ * - Negative mood (radiant): Warm golden glow, bright
+ * - Neutral: Warm white
+ * - Positive mood (overcast): Cool gray, dim
  */
 
 interface EmissivePerimeterProps {
   moodValence?: number;  // -1 to 1
   hour?: number;         // 0-24
-  innerRadius?: number;  // Where ring starts (outside excavation edge)
-  outerRadius?: number;  // Where ring ends
 }
 
 // Seeded random for consistent organic variation (matches ExcavatedBed)
@@ -32,12 +31,14 @@ function seededRandom(seed: number): () => number {
 }
 
 /**
- * Generate organic shape points with wobble
- * This matches the ExcavatedBed generation for visual consistency
+ * Generate organic ellipse ring with wobble
+ * Uses width/depth for ellipse shape (not circular radii)
  */
-function generateOrganicRing(
-  innerRadius: number,
-  outerRadius: number,
+function generateOrganicEllipseRing(
+  innerWidth: number,
+  innerDepth: number,
+  outerWidth: number,
+  outerDepth: number,
   wobbleAmount: number,
   pointCount: number,
   seed: number
@@ -46,19 +47,24 @@ function generateOrganicRing(
   const innerPoints: THREE.Vector2[] = [];
   const outerPoints: THREE.Vector2[] = [];
 
+  const halfInnerW = innerWidth / 2;
+  const halfInnerD = innerDepth / 2;
+  const halfOuterW = outerWidth / 2;
+  const halfOuterD = outerDepth / 2;
+
   for (let i = 0; i < pointCount; i++) {
     const angle = (i / pointCount) * Math.PI * 2;
 
-    // Inner edge wobble
+    // Inner edge wobble (ellipse)
     const innerWobble = 1 + (rand() - 0.5) * wobbleAmount;
-    const innerX = Math.cos(angle) * innerRadius * innerWobble;
-    const innerZ = Math.sin(angle) * innerRadius * innerWobble;
+    const innerX = Math.cos(angle) * halfInnerW * innerWobble;
+    const innerZ = Math.sin(angle) * halfInnerD * innerWobble;
     innerPoints.push(new THREE.Vector2(innerX, innerZ));
 
-    // Outer edge wobble (different random values for variety)
+    // Outer edge wobble (ellipse)
     const outerWobble = 1 + (rand() - 0.5) * wobbleAmount * 0.8;
-    const outerX = Math.cos(angle) * outerRadius * outerWobble;
-    const outerZ = Math.sin(angle) * outerRadius * outerWobble;
+    const outerX = Math.cos(angle) * halfOuterW * outerWobble;
+    const outerZ = Math.sin(angle) * halfOuterD * outerWobble;
     outerPoints.push(new THREE.Vector2(outerX, outerZ));
   }
 
@@ -81,42 +87,38 @@ function getRingIntensity(hour: number, moodValence: number): number {
   } else if (h < 7) {
     // Dawn: transitioning
     const t = (h - 5) / 2;
-    baseIntensity = 0.5 - t * 0.25; // 0.5 → 0.25
+    baseIntensity = 0.5 - t * 0.25;
   } else if (h < 17) {
     // Day: sun dominates, ring subtle
     baseIntensity = 0.25;
   } else if (h < 19) {
     // Pre-dusk
     const t = (h - 17) / 2;
-    baseIntensity = 0.25 + t * 0.1; // 0.25 → 0.35
+    baseIntensity = 0.25 + t * 0.1;
   } else {
     // Evening
     const t = (h - 19) / 2;
-    baseIntensity = 0.35 + t * 0.15; // 0.35 → 0.5
+    baseIntensity = 0.35 + t * 0.15;
   }
 
-  // Mood modifier: negative = brighter (radiant), positive = much dimmer (overcast)
+  // Mood modifier: negative = brighter (radiant), positive = dimmer (overcast)
   const moodMultiplier = moodValence < 0
-    ? 1.0 + (-moodValence) * 0.8  // -1 → 1.8
-    : 1.0 - moodValence * 0.6;    // +1 → 0.4
+    ? 1.0 + (-moodValence) * 0.8
+    : 1.0 - moodValence * 0.6;
 
-  // CAPPED at 1.0 to prevent overexposure
   return Math.min(1.0, baseIntensity * moodMultiplier);
 }
 
 /**
  * Get ring color based on mood and time
- * Warm golden at radiant, cool gray at overcast
  */
 function getRingColor(hour: number, moodValence: number): THREE.Color {
   const h = ((hour % 24) + 24) % 24;
 
-  // Base colors for different weather states
-  const radiantGold = new THREE.Color('#ffcc66');   // Warm golden
-  const neutralWarm = new THREE.Color('#fff0dd');    // Warm white
-  const overcastGray = new THREE.Color('#99aabb');   // Cool gray
+  const radiantGold = new THREE.Color('#ffcc66');
+  const neutralWarm = new THREE.Color('#fff0dd');
+  const overcastGray = new THREE.Color('#99aabb');
 
-  // Interpolate based on mood
   let baseColor: THREE.Color;
   if (moodValence < 0) {
     const t = Math.abs(moodValence);
@@ -129,55 +131,49 @@ function getRingColor(hour: number, moodValence: number): THREE.Color {
   // Time-based color temperature adjustment
   let timeColor: THREE.Color;
   if (h < 6 || h >= 20) {
-    // Night: shift toward cool blue
     timeColor = new THREE.Color('#aabbdd');
   } else if (h < 8) {
-    // Dawn: warm golden
     timeColor = new THREE.Color('#ffd088');
   } else if (h >= 17 && h < 20) {
-    // Dusk: warm orange
     timeColor = new THREE.Color('#ffcc88');
   } else {
-    // Day: neutral
     timeColor = new THREE.Color('#ffffff');
   }
 
-  // Blend base mood color with time color (30% time influence)
   return baseColor.clone().lerp(timeColor, 0.3);
 }
 
 /**
- * Create geometry for organic ring shape
+ * Create geometry for organic ellipse ring shape
  */
-function createOrganicRingGeometry(
-  innerRadius: number,
-  outerRadius: number,
+function createOrganicEllipseRingGeometry(
+  innerWidth: number,
+  innerDepth: number,
+  outerWidth: number,
+  outerDepth: number,
   seed: number
 ): THREE.BufferGeometry {
   const pointCount = 64;
-  const wobbleAmount = 0.08; // Matches ExcavatedBed
+  const wobbleAmount = 0.08;
 
-  const { inner, outer } = generateOrganicRing(
-    innerRadius,
-    outerRadius,
+  const { inner, outer } = generateOrganicEllipseRing(
+    innerWidth,
+    innerDepth,
+    outerWidth,
+    outerDepth,
     wobbleAmount,
     pointCount,
     seed
   );
 
-  // Create vertices and indices for the ring
   const vertices: number[] = [];
   const indices: number[] = [];
 
-  // Add inner and outer ring vertices
   for (let i = 0; i < pointCount; i++) {
-    // Inner vertex at y = 0
     vertices.push(inner[i].x, 0, inner[i].y);
-    // Outer vertex at y = 0
     vertices.push(outer[i].x, 0, outer[i].y);
   }
 
-  // Create triangles
   for (let i = 0; i < pointCount; i++) {
     const next = (i + 1) % pointCount;
     const innerCurrent = i * 2;
@@ -185,7 +181,6 @@ function createOrganicRingGeometry(
     const innerNext = next * 2;
     const outerNext = next * 2 + 1;
 
-    // Two triangles per quad
     indices.push(innerCurrent, outerCurrent, outerNext);
     indices.push(innerCurrent, outerNext, innerNext);
   }
@@ -198,54 +193,60 @@ function createOrganicRingGeometry(
   return geometry;
 }
 
-// Point light positions - arranged around the perimeter, aimed inward
-// Positioned at organic wobble-averaged radius
-const LIGHT_POSITIONS: [number, number, number][] = [
-  [22, 1, 0],
-  [-22, 1, 0],
-  [0, 1, 20],
-  [0, 1, -20],
-  [16, 1, 16],
-  [-16, 1, 16],
-  [16, 1, -16],
-  [-16, 1, -16],
-];
-
 export const EmissivePerimeter: React.FC<EmissivePerimeterProps> = ({
   moodValence = 0,
   hour = 12,
-  innerRadius = 18,
-  outerRadius = 22,
 }) => {
   const gradientMap = useMemo(() => getToonGradient(), []);
 
-  // Generate organic ring geometry with same seed as ExcavatedBed for alignment
+  // Ring dimensions based on excavation bounds
+  // Inner: just outside excavation edge (+3)
+  // Outer: wider ring (+10)
+  const innerWidth = GROUND_BOUNDS.width + 3;
+  const innerDepth = GROUND_BOUNDS.depth + 3;
+  const outerWidth = GROUND_BOUNDS.width + 10;
+  const outerDepth = GROUND_BOUNDS.depth + 10;
+
+  // Generate organic ellipse ring geometry (seed 42 matches ExcavatedBed)
   const ringGeometry = useMemo(() =>
-    createOrganicRingGeometry(innerRadius, outerRadius, 42),
-    [innerRadius, outerRadius]
+    createOrganicEllipseRingGeometry(innerWidth, innerDepth, outerWidth, outerDepth, 42),
+    [innerWidth, innerDepth, outerWidth, outerDepth]
   );
 
-  // Calculate intensity based on time AND mood
   const intensity = useMemo(
     () => getRingIntensity(hour, moodValence),
     [hour, moodValence]
   );
 
-  // Get color based on time AND mood
   const ringColor = useMemo(
     () => getRingColor(hour, moodValence),
     [hour, moodValence]
   );
 
-  // Light intensity scales with ring intensity
   const lightIntensity = intensity * 0.15;
+
+  // Light positions - elliptical arrangement matching ring shape
+  const lightPositions: [number, number, number][] = useMemo(() => {
+    const avgW = (innerWidth + outerWidth) / 4;
+    const avgD = (innerDepth + outerDepth) / 4;
+    return [
+      [avgW, 1, 0],
+      [-avgW, 1, 0],
+      [0, 1, avgD],
+      [0, 1, -avgD],
+      [avgW * 0.7, 1, avgD * 0.7],
+      [-avgW * 0.7, 1, avgD * 0.7],
+      [avgW * 0.7, 1, -avgD * 0.7],
+      [-avgW * 0.7, 1, -avgD * 0.7],
+    ];
+  }, [innerWidth, innerDepth, outerWidth, outerDepth]);
 
   return (
     <group>
-      {/* Organic emissive ring - toon shaded to match aesthetic */}
+      {/* Organic emissive ring - positioned ABOVE floor */}
       <mesh
         geometry={ringGeometry}
-        position={[0, -0.3, 0]}
+        position={[0, 0.02, 0]}
         receiveShadow
       >
         <meshToonMaterial
@@ -258,8 +259,8 @@ export const EmissivePerimeter: React.FC<EmissivePerimeterProps> = ({
         />
       </mesh>
 
-      {/* Point lights around perimeter - cast colored light onto plants */}
-      {LIGHT_POSITIONS.map((pos, i) => (
+      {/* Point lights around perimeter */}
+      {lightPositions.map((pos, i) => (
         <pointLight
           key={i}
           position={pos}

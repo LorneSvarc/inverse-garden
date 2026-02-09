@@ -606,3 +606,75 @@ Created procedural flower growth animation with overlapping phases:
 - Better Ghibli-style puffy shapes
 - More natural arrangement
 - Improved mood response curves
+
+### 2025-02-09 - Scene Assembly: Unified Main Scene with Environment
+
+**Goal:** Assemble all working pieces from separate test scenes into one unified main scene.
+
+**Architecture Change — App.tsx is the base:**
+- Replaced primitive `Lighting()` and `Ground()` components with `SpecimenVitrine` + `PostProcessing` from the vitrine test scene
+- App.tsx chosen because it has the irreplaceable data pipeline (CSV → DNA → positions → timeline → fading)
+- VitrineTest had the best environment but only hardcoded test plants
+- Growth animation (AnimatedToonFlower3D) deferred to follow-up session
+
+**New Components Integrated:**
+- `SpecimenVitrine` — composite environment: ProceduralSky, ToonClouds, SunMesh, ExcavatedBed, LEDWall, TheatricalLighting, AtmosphericFog
+- `PostProcessing` — bloom, god rays, vignette, saturation (with sunMesh ref for god rays)
+- Camera now uses `CAMERA_LIMITS` from environmentConfig (constrained orbit)
+- Canvas upgraded: PCFSoftShadowMap, ACES tone mapping, exposure 0.9
+
+**Data → Environment Bridge (two axes):**
+1. **Time of day** (`hour` from `currentTime`) → drives sun arc, sky colors, theatrical lighting
+2. **Daily mood valence** (`moodValence`) → drives clouds, floor glow, fog, god rays
+
+**Mood Valence Calculation:**
+- Primary: Daily Mood entries matched by calendar day (applied to WHOLE day, not gated by log time)
+- Fallback: Average of ALL Momentary Emotion entries on that day (also applied to whole day)
+- If no entries at all: neutral (0) — only 1 day (Oct 17) in the dataset
+
+**Key Design Decisions (user-directed):**
+- `gardenLevel` controls fading ONLY, NOT atmosphere (corrected from original plan)
+- Daily Mood valence drives atmosphere for the whole calendar day
+- LED wall shows valence classification of most recent entry of any kind (not just Daily Mood)
+- God rays enabled with toggle in dev panel
+- Mood inversion: negative valence = RADIANT (warm, clear); positive = OVERCAST (cool, gloomy)
+
+**Bugs Fixed:**
+1. **moodValence timestamp gate** — Daily Mood entries logged at 10pm-midnight were gated by `timestamp <= currentTime`, so atmosphere was stuck at neutral for ~22 hours/day. Fix: match by calendar date only.
+2. **Momentary fallback timestamp gate** — On 23 days with only Momentary entries, the atmosphere was neutral from midnight until the first entry (~10am). Fix: use whole-day average (same as Daily Mood).
+3. **Bloom threshold too high** — FloorVoid emissive intensity (0.5) was below bloom threshold (0.55), so floor never visibly glowed. Fix: lowered threshold to 0.4.
+4. **Mood value snap at day boundaries** — moodValence changed instantly at midnight causing visual pops. Fix: added `SmoothedMoodBridge` component using `useFrame` + exponential interpolation (~1s transition).
+
+**Spatial Layout Updates (positionCalculator.ts):**
+- `gardenRadius` reduced from 25 to 12 to fit inside ExcavatedBed
+- `dayScatterRadius` reduced from 4 to 2
+- Replaced circular clamping with rectangular clamping to match ExcavatedBed bounds (PLANT_BOUNDS: 34x28)
+
+**Dev Panel Added:**
+- `?dev=true` enables tuning panel with:
+  - Read-only data values (hour, raw mood → smoothed mood, valence text, garden level)
+  - Hour override slider
+  - Mood override slider
+  - Fog density, bloom intensity, bloom threshold, vignette sliders
+  - God rays, clouds, shadows toggles
+
+**Files Modified:**
+- `garden/src/App.tsx` — Major rewrite: SpecimenVitrine/PostProcessing integration, DevPanel, mood bridge, SmoothedMoodBridge
+- `garden/src/utils/positionCalculator.ts` — Rectangular clamping, reduced radii
+- `garden/src/components/environment/PostProcessing.tsx` — bloomThreshold default 0.55 → 0.4
+
+**Files Added (new components from previous sessions, now tracked):**
+- `garden/src/components/NewEnvironmentTest.tsx`
+- `garden/src/components/Backdrop.tsx`
+- `garden/src/components/SceneLighting.tsx`
+- `garden/src/components/environment/EmissiveGround.tsx`
+- `garden/src/components/environment/GallerySurround.tsx`
+- `garden/src/components/environment/SoilBed.tsx`
+- `garden/src/components/environment/VitrineBase.tsx`
+
+**Data Summary (verified):**
+- 306 data rows, 89 unique dates (Oct 16, 2025 - Jan 13, 2026)
+- 66 days with Daily Mood entries
+- 23 days with only Momentary Emotion entries
+- 1 day with no entries (Oct 17)
+- Plants spawn at exact logged timestamp (full datetime precision)

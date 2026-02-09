@@ -1,4 +1,5 @@
 import type { MoodEntryWithPercentile } from '../types';
+import { PLANT_BOUNDS } from '../config/environmentConfig';
 
 /**
  * Spatial Layout: Subtle Temporal Spiral with Scatter
@@ -18,16 +19,21 @@ import type { MoodEntryWithPercentile } from '../types';
  *    - Tight enough to read as "same moment in time"
  *
  * All randomness is seeded from timestamps for reproducibility.
+ * Positions are clamped to fit within the ExcavatedBed rectangular bounds.
  */
 
 // ============================================
 // CONFIGURATION
 // ============================================
 
+// Rectangular half-extents for plant placement (inset from PLANT_BOUNDS edges)
+const HALF_W = PLANT_BOUNDS.width / 2 - 2; // 15
+const HALF_D = PLANT_BOUNDS.depth / 2 - 2; // 12
+
 const CONFIG = {
-  gardenRadius: 25,           // Overall plantable area radius
+  gardenRadius: 12,            // Spiral radius (fits within rectangular depth)
   spiralRotations: 3.5,       // How many times spiral wraps around
-  dayScatterRadius: 4,        // How far a day drifts from spiral position (reduced from 8 to fix center-clustering)
+  dayScatterRadius: 2,        // How far a day drifts from spiral position
   entryScatterRadius: 1.5,    // How far entries spread within a day
   minEntrySpacing: 0.8,       // Minimum distance between entries in same day cluster
   minStemDistance: 2.0,       // Global minimum distance between ANY two plant stems
@@ -165,14 +171,10 @@ export function calculatePositions(
     const dayX = spiralX + Math.cos(scatterAngle) * scatterDistance;
     const dayZ = spiralZ + Math.sin(scatterAngle) * scatterDistance;
 
-    // Clamp to garden bounds (soft clamp - push back gently)
-    const distFromCenter = Math.sqrt(dayX * dayX + dayZ * dayZ);
-    if (distFromCenter > CONFIG.gardenRadius) {
-      const scale = CONFIG.gardenRadius / distFromCenter;
-      dayPositions.set(dateStr, [dayX * scale * 0.95, dayZ * scale * 0.95]);
-    } else {
-      dayPositions.set(dateStr, [dayX, dayZ]);
-    }
+    // Clamp to rectangular plant bounds
+    const clampedX = Math.max(-HALF_W, Math.min(HALF_W, dayX));
+    const clampedZ = Math.max(-HALF_D, Math.min(HALF_D, dayZ));
+    dayPositions.set(dateStr, [clampedX, clampedZ]);
   }
 
   // Track ALL placed positions globally for collision detection
@@ -212,13 +214,9 @@ export function calculatePositions(
       nudgeX += Math.cos(nudgeAngle) * nudgeDistance;
       nudgeZ += Math.sin(nudgeAngle) * nudgeDistance;
 
-      // Clamp to garden bounds
-      const newDist = Math.sqrt(nudgeX * nudgeX + nudgeZ * nudgeZ);
-      if (newDist > CONFIG.gardenRadius * 0.95) {
-        const scale = (CONFIG.gardenRadius * 0.95) / newDist;
-        nudgeX *= scale;
-        nudgeZ *= scale;
-      }
+      // Clamp to rectangular plant bounds
+      nudgeX = Math.max(-HALF_W, Math.min(HALF_W, nudgeX));
+      nudgeZ = Math.max(-HALF_D, Math.min(HALF_D, nudgeZ));
 
       attempts++;
     }

@@ -1,13 +1,16 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { MoodEntryWithPercentile, PlantDNA } from './types';
 import { parseCSVWithPercentiles } from './utils/csvParser';
 import { entryToDNA, getPlantType } from './utils/dnaMapper';
-import { calculatePositions, getLayoutConfig } from './utils/positionCalculator';
+import { calculatePositions } from './utils/positionCalculator';
 import { calculateGardenLevel } from './utils/gardenLevel';
 import { calculateFadeState, type FadeState } from './utils/plantFading';
+import { SpecimenVitrine } from './components/environment/SpecimenVitrine';
+import { PostProcessing } from './components/environment/PostProcessing';
+import { CAMERA_LIMITS } from './config/environmentConfig';
 import CleanToonFlower3D from './components/CleanToonFlower3D';
 import CleanToonSprout3D from './components/CleanToonSprout3D';
 import CleanToonDecay3D from './components/CleanToonDecay3D';
@@ -16,6 +19,8 @@ import TestScene from './components/TestScene';
 import AtmospherePlayground from './components/AtmospherePlayground';
 import EnvironmentTest from './components/EnvironmentTest';
 import ExhibitTest from './components/ExhibitTest';
+import NewEnvironmentTest from './components/NewEnvironmentTest';
+import VitrineTest from './components/VitrineTest';
 import './App.css';
 
 /**
@@ -43,10 +48,55 @@ function isExhibitTestMode(): boolean {
 }
 
 /**
+ * Check if new environment test mode is enabled via URL parameter
+ */
+function isNewEnvironmentTestMode(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('test') === 'newenv';
+}
+
+/**
+ * Check if vitrine test mode is enabled via URL parameter
+ */
+function isVitrineTestMode(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('test') === 'vitrine';
+}
+
+/**
  * Check if playground mode is enabled via URL path
  */
 function isPlaygroundMode(): boolean {
   return window.location.pathname === '/playground';
+}
+
+/**
+ * Smooths a value over time using exponential interpolation.
+ * Must be rendered inside Canvas (uses useFrame).
+ * Prevents jarring visual pops when moodValence changes at day boundaries.
+ */
+function SmoothedMoodBridge({
+  target,
+  smoothingSpeed,
+  onUpdate,
+}: {
+  target: number;
+  smoothingSpeed: number;  // Higher = faster transition (e.g., 3 = ~0.3s to settle)
+  onUpdate: (smoothed: number) => void;
+}) {
+  const currentRef = useRef(target);
+
+  useFrame((_, delta) => {
+    const current = currentRef.current;
+    const diff = target - current;
+    // Exponential decay toward target
+    const smoothed = current + diff * (1 - Math.exp(-smoothingSpeed * delta));
+    // Snap if very close (avoid floating point drift)
+    currentRef.current = Math.abs(diff) < 0.001 ? target : smoothed;
+    onUpdate(currentRef.current);
+  });
+
+  return null;
 }
 
 /**
@@ -74,34 +124,191 @@ function Plant({
 }
 
 /**
- * Ground plane for the garden
- * Size matches the garden radius from positionCalculator
- * Uses DoubleSide rendering to prevent disappearing at certain camera angles
+ * Dev controls panel for tuning environment parameters
+ * Only visible when ?dev=true is in the URL
  */
-function Ground() {
-  const { gardenRadius } = getLayoutConfig();
-  // Make ground slightly larger than plant area for visual margin
-  const groundRadius = gardenRadius * 1.3;
+function DevPanel({
+  dataHour,
+  dataMood,
+  smoothedMood,
+  dataValenceText,
+  gardenLevel,
+  overrides,
+  onChange,
+}: {
+  dataHour: number;
+  dataMood: number;
+  smoothedMood: number;
+  dataValenceText: string;
+  gardenLevel: number;
+  overrides: DevOverrides;
+  onChange: (overrides: DevOverrides) => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  const update = (partial: Partial<DevOverrides>) => {
+    onChange({ ...overrides, ...partial });
+  };
 
   return (
-    <mesh position={[0, 0, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <circleGeometry args={[groundRadius, 64]} />
-      <meshStandardMaterial color="#8B7355" roughness={1} side={THREE.DoubleSide} />
-    </mesh>
+    <div
+      style={{
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        zIndex: 10,
+        background: 'rgba(0, 0, 0, 0.9)',
+        color: '#fff',
+        padding: '12px',
+        borderRadius: '8px',
+        fontFamily: 'monospace',
+        fontSize: '11px',
+        minWidth: open ? '280px' : 'auto',
+        maxHeight: 'calc(100vh - 100px)',
+        overflowY: 'auto',
+      }}
+    >
+      <div
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+        onClick={() => setOpen(!open)}
+      >
+        <span style={{ fontWeight: 'bold', fontSize: '12px' }}>Dev Controls</span>
+        <span>{open ? '\u2212' : '+'}</span>
+      </div>
+
+      {open && (
+        <div style={{ marginTop: '8px' }}>
+          {/* Read-only data values */}
+          <div style={{ padding: '6px 0', borderBottom: '1px solid #333', marginBottom: '8px', color: '#888' }}>
+            <div>Data hour: {dataHour.toFixed(1)}h</div>
+            <div>Data mood: {dataMood.toFixed(2)} → {smoothedMood.toFixed(2)}</div>
+            <div>Valence text: {dataValenceText}</div>
+            <div>Garden level: {gardenLevel.toFixed(2)}</div>
+          </div>
+
+          {/* Hour override */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <input
+              type="checkbox"
+              checked={overrides.hourOverride !== null}
+              onChange={(e) => update({ hourOverride: e.target.checked ? dataHour : null })}
+            />
+            <span style={{ width: '80px' }}>Hour</span>
+            {overrides.hourOverride !== null && (
+              <>
+                <input
+                  type="range" min={0} max={24} step={0.5}
+                  value={overrides.hourOverride}
+                  onChange={(e) => update({ hourOverride: parseFloat(e.target.value) })}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ width: '40px', textAlign: 'right' }}>{overrides.hourOverride.toFixed(1)}</span>
+              </>
+            )}
+            {overrides.hourOverride === null && <span style={{ color: '#666' }}>Auto</span>}
+          </label>
+
+          {/* Mood override */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <input
+              type="checkbox"
+              checked={overrides.moodOverride !== null}
+              onChange={(e) => update({ moodOverride: e.target.checked ? dataMood : null })}
+            />
+            <span style={{ width: '80px' }}>Mood</span>
+            {overrides.moodOverride !== null && (
+              <>
+                <input
+                  type="range" min={-1} max={1} step={0.05}
+                  value={overrides.moodOverride}
+                  onChange={(e) => update({ moodOverride: parseFloat(e.target.value) })}
+                  style={{ flex: 1 }}
+                />
+                <span style={{ width: '40px', textAlign: 'right' }}>{overrides.moodOverride.toFixed(2)}</span>
+              </>
+            )}
+            {overrides.moodOverride === null && <span style={{ color: '#666' }}>Auto</span>}
+          </label>
+
+          {/* Fog density */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <span style={{ width: '90px' }}>Fog density</span>
+            <input
+              type="range" min={0} max={0.03} step={0.001}
+              value={overrides.fogDensity ?? 0.008}
+              onChange={(e) => update({ fogDensity: parseFloat(e.target.value) })}
+              style={{ flex: 1 }}
+            />
+            <span style={{ width: '40px', textAlign: 'right' }}>{(overrides.fogDensity ?? 0.008).toFixed(3)}</span>
+          </label>
+
+          {/* Bloom intensity */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <span style={{ width: '90px' }}>Bloom</span>
+            <input
+              type="range" min={0} max={5} step={0.1}
+              value={overrides.bloomIntensity}
+              onChange={(e) => update({ bloomIntensity: parseFloat(e.target.value) })}
+              style={{ flex: 1 }}
+            />
+            <span style={{ width: '40px', textAlign: 'right' }}>{overrides.bloomIntensity.toFixed(1)}</span>
+          </label>
+
+          {/* Bloom threshold */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <span style={{ width: '90px' }}>Bloom thresh</span>
+            <input
+              type="range" min={0} max={1} step={0.05}
+              value={overrides.bloomThreshold}
+              onChange={(e) => update({ bloomThreshold: parseFloat(e.target.value) })}
+              style={{ flex: 1 }}
+            />
+            <span style={{ width: '40px', textAlign: 'right' }}>{overrides.bloomThreshold.toFixed(2)}</span>
+          </label>
+
+          {/* Vignette */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+            <span style={{ width: '90px' }}>Vignette</span>
+            <input
+              type="range" min={0} max={1} step={0.05}
+              value={overrides.vignetteStrength}
+              onChange={(e) => update({ vignetteStrength: parseFloat(e.target.value) })}
+              style={{ flex: 1 }}
+            />
+            <span style={{ width: '40px', textAlign: 'right' }}>{overrides.vignetteStrength.toFixed(2)}</span>
+          </label>
+
+          {/* Toggles */}
+          <div style={{ marginTop: '8px', borderTop: '1px solid #333', paddingTop: '8px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={overrides.godRaysEnabled} onChange={(e) => update({ godRaysEnabled: e.target.checked })} />
+              <span>God Rays</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={overrides.cloudsEnabled} onChange={(e) => update({ cloudsEnabled: e.target.checked })} />
+              <span>Clouds</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={overrides.shadowsEnabled} onChange={(e) => update({ shadowsEnabled: e.target.checked })} />
+              <span>Shadows</span>
+            </label>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-/**
- * Scene lighting
- */
-function Lighting() {
-  return (
-    <>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 10, 5]} intensity={1} />
-      <directionalLight position={[-10, 10, -5]} intensity={0.5} />
-    </>
-  );
+interface DevOverrides {
+  hourOverride: number | null;
+  moodOverride: number | null;
+  fogDensity: number | undefined;
+  bloomIntensity: number;
+  bloomThreshold: number;
+  vignetteStrength: number;
+  godRaysEnabled: boolean;
+  cloudsEnabled: boolean;
+  shadowsEnabled: boolean;
 }
 
 /**
@@ -135,6 +342,12 @@ function App() {
   if (isExhibitTestMode()) {
     return <ExhibitTest />;
   }
+  if (isNewEnvironmentTestMode()) {
+    return <NewEnvironmentTest />;
+  }
+  if (isVitrineTestMode()) {
+    return <VitrineTest />;
+  }
   if (isPlaygroundMode()) {
     return <AtmospherePlayground />;
   }
@@ -159,6 +372,23 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false); // Start collapsed for timeline view
+
+  // Environment state
+  const [sunMesh, setSunMesh] = useState<THREE.Mesh | null>(null);
+
+  // Dev mode: ?dev=true enables tuning panel
+  const isDevMode = useMemo(() => new URLSearchParams(window.location.search).get('dev') === 'true', []);
+  const [devOverrides, setDevOverrides] = useState<DevOverrides>({
+    hourOverride: null,
+    moodOverride: null,
+    fogDensity: undefined,
+    bloomIntensity: 1.0,
+    bloomThreshold: 0.4,
+    vignetteStrength: 0.2,
+    godRaysEnabled: true,
+    cloudsEnabled: true,
+    shadowsEnabled: true,
+  });
 
   // Load and parse CSV data
   useEffect(() => {
@@ -232,6 +462,58 @@ function App() {
     if (!currentTime) return 0;
     return calculateGardenLevel(allEntries, currentTime);
   }, [allEntries, currentTime]);
+
+  // === DATA → ENVIRONMENT BRIDGE ===
+
+  // Hour from currentTime (drives sun arc, sky colors, lighting)
+  const hour = useMemo(() => {
+    if (!currentTime) return 12;
+    return currentTime.getHours() + currentTime.getMinutes() / 60;
+  }, [currentTime]);
+
+  // Daily mood valence — from Daily Mood entries on the current calendar day
+  // Drives clouds, floor glow (outside bed), fog, atmospheric effects
+  // Daily Mood applies to the WHOLE calendar day (not gated by log time)
+  const moodValence = useMemo(() => {
+    if (!currentTime || allEntries.length === 0) return 0;
+    const currentDay = currentTime.toDateString();
+
+    // First: use Daily Mood entry if one exists for this calendar day
+    const dailyMoodEntries = allEntries.filter(e =>
+      e.kind === 'Daily Mood' &&
+      e.timestamp.toDateString() === currentDay
+    );
+    if (dailyMoodEntries.length > 0) {
+      const avg = dailyMoodEntries.reduce((sum, e) => sum + e.valence, 0) / dailyMoodEntries.length;
+      return Math.max(-1, Math.min(1, avg));
+    }
+
+    // Fallback: average of ALL Momentary Emotion entries on this day
+    // Applied to whole day (same behavior as Daily Mood)
+    const momentaryEntries = allEntries.filter(e =>
+      e.kind === 'Momentary Emotion' &&
+      e.timestamp.toDateString() === currentDay
+    );
+    if (momentaryEntries.length > 0) {
+      const avg = momentaryEntries.reduce((sum, e) => sum + e.valence, 0) / momentaryEntries.length;
+      return Math.max(-1, Math.min(1, avg));
+    }
+
+    return 0; // No entries at all for this day
+  }, [allEntries, currentTime]);
+
+  // LED wall text: valence classification of most recent entry of any kind
+  const valenceText = useMemo(() => {
+    if (!currentTime) return 'NEUTRAL';
+    const pastEntries = allEntries.filter(e => e.timestamp <= currentTime);
+    if (pastEntries.length === 0) return 'NEUTRAL';
+    return pastEntries[pastEntries.length - 1].valenceClassification.toUpperCase();
+  }, [allEntries, currentTime]);
+
+  // Effective values: dev override if set, otherwise data-derived
+  const effectiveHour = devOverrides.hourOverride ?? hour;
+  const targetMood = devOverrides.moodOverride ?? moodValence;
+  const [smoothedMood, setSmoothedMood] = useState(0);
 
   // Filter entries that have been created by current time
   // (they may still be visible even if fading)
@@ -309,6 +591,19 @@ function App() {
         </span>
       </div>
 
+      {/* Dev controls panel - only visible with ?dev=true */}
+      {isDevMode && (
+        <DevPanel
+          dataHour={hour}
+          dataMood={moodValence}
+          smoothedMood={smoothedMood}
+          dataValenceText={valenceText}
+          gardenLevel={gardenLevel}
+          overrides={devOverrides}
+          onChange={setDevOverrides}
+        />
+      )}
+
       {/* Collapsible info panel */}
       <div className={`info-panel ${panelOpen ? 'open' : 'collapsed'}`}>
         <div className="panel-header" onClick={() => setPanelOpen(!panelOpen)}>
@@ -358,12 +653,25 @@ function App() {
       />
 
       <Canvas
-        camera={{ position: [0, 30, 40], fov: 60 }}
-        style={{ background: '#1a1a2e' }}
+        shadows={{ type: THREE.PCFSoftShadowMap }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 0.9 }}
+        camera={{ position: [0, 25, 35], fov: 50 }}
       >
-        <Lighting />
-        <Ground />
+        {/* Smooth mood transitions between frames */}
+        <SmoothedMoodBridge target={targetMood} smoothingSpeed={3} onUpdate={setSmoothedMood} />
 
+        {/* Environment: sky, clouds, lighting, ground, LED wall */}
+        <SpecimenVitrine
+          hour={effectiveHour}
+          moodValence={smoothedMood}
+          valenceText={valenceText}
+          shadowsEnabled={devOverrides.shadowsEnabled}
+          fogDensity={devOverrides.fogDensity}
+          cloudsEnabled={devOverrides.cloudsEnabled}
+          onSunMeshReady={setSunMesh}
+        />
+
+        {/* Plants */}
         {visiblePlants.map((plantDNA, index) => {
           const entry = visibleEntries[index];
           const fadeState = fadeStates.get(entry.id) ?? { opacity: 1, saturation: 1, isVisible: true };
@@ -378,12 +686,28 @@ function App() {
           );
         })}
 
+        {/* Post-processing: bloom, god rays, vignette, saturation */}
+        <PostProcessing
+          bloomIntensity={devOverrides.bloomIntensity}
+          bloomThreshold={devOverrides.bloomThreshold}
+          bloomRadius={0.7}
+          vignetteStrength={devOverrides.vignetteStrength}
+          moodValence={smoothedMood}
+          sunMesh={sunMesh}
+          godRaysEnabled={devOverrides.godRaysEnabled}
+        />
+
         <OrbitControls
           enablePan={true}
           enableZoom={true}
           enableRotate={true}
-          minDistance={5}
-          maxDistance={100}
+          minDistance={CAMERA_LIMITS.minDistance}
+          maxDistance={CAMERA_LIMITS.maxDistance}
+          minPolarAngle={CAMERA_LIMITS.minPolarAngle}
+          maxPolarAngle={CAMERA_LIMITS.maxPolarAngle}
+          minAzimuthAngle={CAMERA_LIMITS.minAzimuthAngle}
+          maxAzimuthAngle={CAMERA_LIMITS.maxAzimuthAngle}
+          target={[0, 2, 0]}
         />
       </Canvas>
     </div>

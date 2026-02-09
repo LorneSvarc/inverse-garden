@@ -38,7 +38,7 @@ interface PostProcessingProps {
 
 export const PostProcessing: React.FC<PostProcessingProps> = ({
   bloomIntensity = 1.0,       // Reduced from 1.5
-  bloomThreshold = 0.55,     // RAISED from 0.2 - catches less
+  bloomThreshold = 0.4,      // Lowered so floor emissive (0.5 intensity) triggers bloom
   bloomRadius = 0.7,          // Slightly reduced
   vignetteStrength = 0.2,    // REDUCED from 0.3
   chromaticAberration = false, // DISABLED by default
