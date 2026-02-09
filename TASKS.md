@@ -565,3 +565,44 @@ Created procedural flower growth animation with overlapping phases:
 - Linear scaling for petals (no easing) provides smooth, visible growth
 - Petal stagger: each petal takes 0.5 of bloom phase to fully open, staggered over first 0.5 of bloom phase
 - Removed elastic easing which caused instant jumps
+
+### 2025-02-09 - ToonClouds v10: Ghibli-Style Gradient Clouds
+
+**Implementation:** `garden/src/components/environment/ToonClouds.tsx`
+
+**Major Improvements:**
+- Replaced simple sphere-puff clouds with Ghibli-style gradient clouds
+- Top-to-bottom gradient shading using vertex colors (lit tops, shadowed undersides)
+- Custom geometry merging for smooth cloud shapes
+
+**Mood-Responsive Dynamics:**
+| Mood State | Color | Opacity | Scale |
+|------------|-------|---------|-------|
+| Neutral (0) | White/bright | 40% (wispy) | 0.7x (small) |
+| Positive (+1) | Gray/heavy | 100% (dense) | 1.2x (large) |
+
+- Coverage: Clouds start appearing at mood -0.2, full coverage at +1
+- Density: Wispy transparent at neutral, solid opaque at positive
+- Scale: Small clouds at neutral, large puffy clouds at positive
+- Color: White tops with light shadows → Gray tops with dark shadows
+
+**Time-of-Day Color Variations:**
+- Night (20-6): Silvery blue-gray
+- Dawn (6-8): Warm peachy white
+- Day (8-17): Bright white to heavy gray
+- Dusk (17-20): Warm amber tints
+
+**Camera Controls Added to VitrineTest:**
+- Min/Max Distance sliders (default: 20-35)
+- Min/Max Polar Angle sliders (default: 0.1π - 0.43π)
+- Useful for finding optimal cloud viewing positions
+
+**Cloud Positioning:**
+- Clouds placed at y=18 (lowered from 28 for visibility from default camera)
+- Z positions: -15 to -40 (behind garden)
+- X spread: -38 to +30 for full sky coverage
+
+**Note:** Clouds are functional but still need refinement. Current implementation is a placeholder - future improvements could include:
+- Better Ghibli-style puffy shapes
+- More natural arrangement
+- Improved mood response curves
