@@ -49,7 +49,7 @@ export interface FadeState {
  * @param valence - The plant's valence (-1 to 1)
  * @returns Lifespan in milliseconds
  */
-function getEffectiveLifespan(valence: number): number {
+export function getEffectiveLifespan(valence: number): number {
   const baseLifespanMs = FADING_CONFIG.baseLifespanDays * 24 * 60 * 60 * 1000;
 
   // Higher |valence| = longer lifespan

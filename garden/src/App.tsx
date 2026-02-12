@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { MoodEntryWithPercentile, PlantDNA } from './types';
 import { parseCSVWithPercentiles } from './utils/csvParser';
 import { entryToDNA, getPlantType } from './utils/dnaMapper';
-import { calculatePositions } from './utils/positionCalculator';
+import { calculatePositions, calculatePositionsWithDebug, type PatchDebugInfo } from './utils/positionCalculator';
 import { calculateGardenLevel } from './utils/gardenLevel';
 import { calculateFadeState, type FadeState } from './utils/plantFading';
 import { SpecimenVitrine } from './components/environment/SpecimenVitrine';
@@ -15,12 +15,14 @@ import CleanToonFlower3D from './components/CleanToonFlower3D';
 import CleanToonSprout3D from './components/CleanToonSprout3D';
 import CleanToonDecay3D from './components/CleanToonDecay3D';
 import TimelineControls from './components/TimelineControls';
+import PatchDebugOverlay from './components/PatchDebugOverlay';
 import TestScene from './components/TestScene';
 import AtmospherePlayground from './components/AtmospherePlayground';
 import EnvironmentTest from './components/EnvironmentTest';
 import ExhibitTest from './components/ExhibitTest';
 import NewEnvironmentTest from './components/NewEnvironmentTest';
 import VitrineTest from './components/VitrineTest';
+import FallenBloomGenerator from './components/FallenBloomGenerator';
 import './App.css';
 
 /**
@@ -66,6 +68,11 @@ function isVitrineTestMode(): boolean {
 /**
  * Check if playground mode is enabled via URL path
  */
+function isFallenBloomTestMode(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('test') === 'fallenbloom';
+}
+
 function isPlaygroundMode(): boolean {
   return window.location.pathname === '/playground';
 }
@@ -292,6 +299,10 @@ function DevPanel({
               <input type="checkbox" checked={overrides.shadowsEnabled} onChange={(e) => update({ shadowsEnabled: e.target.checked })} />
               <span>Shadows</span>
             </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={overrides.patchDebugEnabled} onChange={(e) => update({ patchDebugEnabled: e.target.checked })} />
+              <span>Patch Debug</span>
+            </label>
           </div>
         </div>
       )}
@@ -309,6 +320,7 @@ interface DevOverrides {
   godRaysEnabled: boolean;
   cloudsEnabled: boolean;
   shadowsEnabled: boolean;
+  patchDebugEnabled: boolean;
 }
 
 /**
@@ -348,6 +360,9 @@ function App() {
   if (isVitrineTestMode()) {
     return <VitrineTest />;
   }
+  if (isFallenBloomTestMode()) {
+    return <FallenBloomGenerator />;
+  }
   if (isPlaygroundMode()) {
     return <AtmospherePlayground />;
   }
@@ -357,6 +372,9 @@ function App() {
 
   // Pre-calculated positions for all entries (stable, doesn't change with timeline)
   const [positions, setPositions] = useState<Map<string, [number, number, number]>>(new Map());
+
+  // Patch debug info (populated when using patch-based positioning)
+  const [patchDebugInfo, setPatchDebugInfo] = useState<PatchDebugInfo[]>([]);
 
   // Time bounds of the data
   const [timeBounds, setTimeBounds] = useState<{ earliest: Date; latest: Date } | null>(null);
@@ -388,6 +406,7 @@ function App() {
     godRaysEnabled: true,
     cloudsEnabled: true,
     shadowsEnabled: true,
+    patchDebugEnabled: false,
   });
 
   // Load and parse CSV data
@@ -413,11 +432,12 @@ function App() {
         console.log('Time bounds:', bounds.earliest, 'to', bounds.latest);
 
         // Calculate stable positions for all entries (done once at load time)
-        const calculatedPositions = calculatePositions(sortedEntries);
-        console.log(`Calculated positions for ${calculatedPositions.size} entries`);
+        const { positions: calculatedPositions, patches } = calculatePositionsWithDebug(sortedEntries);
+        console.log(`Calculated positions for ${calculatedPositions.size} entries across ${patches.length} patches`);
 
         setAllEntries(sortedEntries);
         setPositions(calculatedPositions);
+        setPatchDebugInfo(patches);
         setTimeBounds(bounds);
         // Start at the earliest time (empty garden, will grow as we advance)
         setCurrentTime(bounds.earliest);
@@ -691,6 +711,11 @@ function App() {
             />
           );
         })}
+
+        {/* Patch debug overlay — dev mode only */}
+        {isDevMode && devOverrides.patchDebugEnabled && (
+          <PatchDebugOverlay patches={patchDebugInfo} currentTime={currentTime} />
+        )}
 
         {/* Post-processing: bloom, god rays, vignette, saturation */}
         <PostProcessing
