@@ -31,3 +31,51 @@ export function getToonGradient(): THREE.DataTexture {
   }
   return toonGradientTexture;
 }
+
+// ─── Decay Gradient ──────────────────────────────────────────────────────────
+// Interpolates between normal (bright, 4-band) and harsh (dark, matte, 3-band)
+// based on decayAmount. Cached by quantized decayAmount to avoid creating
+// a new texture every render.
+
+const decayGradientCache = new Map<number, THREE.DataTexture>();
+
+function createDecayGradientTexture(decayAmount: number): THREE.DataTexture {
+  const t = decayAmount; // 0=normal, 1=harsh
+
+  // Normal bands:  64 / 128 / 200 / 255
+  // Harsh bands:   40 / 100 / 160 / 160  (no bright highlight, darker overall)
+  const dark = Math.round(64 - t * 24);       // 64 → 40
+  const mid = Math.round(128 - t * 28);       // 128 → 100
+  const light = Math.round(200 - t * 40);     // 200 → 160
+  const highlight = Math.round(255 - t * 95); // 255 → 160 (kills the bright highlight)
+
+  const colors = new Uint8Array([
+    dark, dark, dark, 255,
+    mid, mid, mid, 255,
+    light, light, light, 255,
+    highlight, highlight, highlight, 255,
+  ]);
+  const texture = new THREE.DataTexture(colors, 4, 1, THREE.RGBAFormat);
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/**
+ * Returns a decay-aware toon gradient.
+ * decayAmount=0: normal bright gradient (same as getToonGradient)
+ * decayAmount=1: dark, matte, no highlights — dried/dead look
+ */
+export function getDecayToonGradient(decayAmount: number): THREE.DataTexture {
+  if (decayAmount <= 0) return getToonGradient();
+
+  // Quantize to 0.05 steps for caching (max 20 textures)
+  const key = Math.round(Math.min(1, decayAmount) * 20);
+  let cached = decayGradientCache.get(key);
+  if (!cached) {
+    cached = createDecayGradientTexture(key / 20);
+    decayGradientCache.set(key, cached);
+  }
+  return cached;
+}

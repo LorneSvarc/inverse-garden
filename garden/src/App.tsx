@@ -13,7 +13,7 @@ import { PostProcessing } from './components/environment/PostProcessing';
 import { CAMERA_LIMITS } from './config/environmentConfig';
 import CleanToonFlower3D from './components/CleanToonFlower3D';
 import CleanToonSprout3D from './components/CleanToonSprout3D';
-import CleanToonDecay3D from './components/CleanToonDecay3D';
+import FallenBloom3D from './components/FallenBloom3D';
 import TimelineControls from './components/TimelineControls';
 import PatchDebugOverlay from './components/PatchDebugOverlay';
 import TestScene from './components/TestScene';
@@ -126,7 +126,25 @@ function Plant({
     case 'sprout':
       return <CleanToonSprout3D dna={plantDNA.dna} position={position} opacity={opacity} saturation={saturation} />;
     case 'decay':
-      return <CleanToonDecay3D dna={plantDNA.dna} position={position} opacity={opacity} saturation={saturation} />;
+      return (
+        <FallenBloom3D
+          seed={plantDNA.dna.seed}
+          petalLength={plantDNA.dna.petalLength}
+          petalWidth={plantDNA.dna.petalWidth}
+          stemLength={plantDNA.dna.stemLength}
+          leafSize={plantDNA.dna.leafSize}
+          scale={plantDNA.dna.scale}
+          decayAmount={plantDNA.dna.decayAmount}
+          frayAmount={plantDNA.dna.frayAmount}
+          frayDensity={plantDNA.dna.frayDensity}
+          petalColors={plantDNA.dna.petalColors}
+          stemColors={plantDNA.dna.stemColors}
+          opacity={opacity}
+          saturation={saturation}
+          position={position}
+          rotation={plantDNA.dna.rotation}
+        />
+      );
   }
 }
 

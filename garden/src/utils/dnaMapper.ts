@@ -4,7 +4,7 @@ import type {
   PlantDNA,
   FlowerDNA,
   SproutDNA,
-  DecayDNA,
+  FallenBloomDNA,
 } from '../types';
 import { percentileToScale } from './percentileCalculator';
 
@@ -133,11 +133,12 @@ const SPROUT_DEFAULTS = {
   swayAmount: 0.3,
 };
 
-const DECAY_DEFAULTS = {
-  aspectRatio: 1.0,
-  edgeWobble: 0.3,
-  crackCount: 8,
-  crackWobble: 0.4,
+const FALLEN_BLOOM_DEFAULTS = {
+  petalLength: 0.35,
+  petalWidth: 0.18,
+  stemLength: 0.35,
+  leafSize: 0.5,
+  frayDensity: 0.8,  // always max density; frayAmount drives visual intensity
 };
 
 // Scale ranges by plant type (updated for Phase 1.5)
@@ -145,7 +146,7 @@ const DECAY_DEFAULTS = {
 const SCALE_RANGES = {
   flower: { min: 0.4, max: 1.8 },
   sprout: { min: 0.8, max: 1.0 },  // Narrow range, always visible
-  decay: { min: 0.4, max: 1.8 },
+  decay: { min: 1.0, max: 3.6 },
 };
 
 // ============================================
@@ -336,46 +337,52 @@ function buildSproutDNA(entry: MoodEntryWithPercentile): SproutDNA {
 }
 
 /**
- * Build DecayDNA from a mood entry
+ * Build FallenBloomDNA from a mood entry
  *
- * Color application:
- * - 1 emotion: All three layers are that color
- * - 2 emotions: Layer 1 (inner) = primary, Layers 2-3 = secondary
- * - 3 emotions: Layer 1 = primary, Layer 2 = secondary, Layer 3 = tertiary
+ * Fallen blooms represent positive emotions (contentment, peace, calm).
+ * They appear as scattered fallen flower debris on the ground.
  *
- * Crack application:
- * - 1 association: All cracks are that color
- * - 2-3 associations: Cracks cycle through association colors
+ * Fray encoding:
+ * - Valence drives frayAmount: slightly pleasant = light fray, very pleasant = heavy fray
+ * - Density is fixed at max (0.8) — amount alone controls visual intensity
+ *
+ * Color encoding:
+ * - Emotions → petal colors (1-3 petals stacked like cards)
+ * - Associations → stem color (A0) + leaf colors (A1, A2)
  */
-function buildDecayDNA(entry: MoodEntryWithPercentile): DecayDNA {
+function buildFallenBloomDNA(entry: MoodEntryWithPercentile): FallenBloomDNA {
   const emotionColors = getEmotionColors(entry.emotions);
   const associationColors = getAssociationColors(entry.associations);
+  const random = createSeededRandom(entry.timestamp.getTime());
 
-  // Layer colors based on emotion count
-  const layer1Color = emotionColors[0];
-  const layer2Color = emotionColors[1] || layer1Color;
-  const layer3Color = emotionColors[2] || layer1Color;
-
-  // Crack colors cycle through associations
-  const crack1Color = associationColors[0];
-  const crack2Color = associationColors[1] || crack1Color;
-  const crack3Color = associationColors[2] || crack1Color;
+  // Fixed decay aesthetic — all decays share the same "fallen" look
+  // decayAmount drives gradient darkening, vertex browning, curl, and fray
+  // Scale is the primary valence signal (bigger = more intense positive emotion)
+  const FIXED_DECAY_AMOUNT = 0.55;
 
   return {
     name: entry.id,
-    description: `Decay from ${entry.timestamp.toLocaleDateString()}`,
+    description: `Fallen bloom from ${entry.timestamp.toLocaleDateString()}`,
 
-    // Fixed defaults
-    ...DECAY_DEFAULTS,
+    // Fixed shape defaults (variation system can adjust later)
+    ...FALLEN_BLOOM_DEFAULTS,
 
-    // Data-driven values - note: decay uses 'size' not 'scale'
-    size: calculateScaleFromPercentile(entry.scalePercentile, 'decay'),
-    layer1Color,
-    layer2Color,
-    layer3Color,
-    crack1Color,
-    crack2Color,
-    crack3Color,
+    // Scale from percentile: primary valence channel (1.0-3.6 range)
+    scale: calculateScaleFromPercentile(entry.scalePercentile, 'decay'),
+
+    // Decay look (fixed for all decays)
+    decayAmount: FIXED_DECAY_AMOUNT,
+
+    // Fraying — will be overridden by decayAmount in FallenBloom3D (kept for interface compat)
+    frayAmount: FIXED_DECAY_AMOUNT * 2.0,
+
+    // Colors: emotions → petals, associations → stem + leaves
+    petalColors: emotionColors,
+    stemColors: associationColors,
+
+    // Randomization
+    seed: entry.timestamp.getTime(),
+    rotation: random() * Math.PI * 2,
   };
 }
 
@@ -403,7 +410,7 @@ export function entryToDNA(entry: MoodEntryWithPercentile): PlantDNA {
     case 'sprout':
       return { type: 'sprout', dna: buildSproutDNA(entry) };
     case 'decay':
-      return { type: 'decay', dna: buildDecayDNA(entry) };
+      return { type: 'decay', dna: buildFallenBloomDNA(entry) };
   }
 }
 

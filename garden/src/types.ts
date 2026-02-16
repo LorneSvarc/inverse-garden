@@ -20,27 +20,46 @@ export interface FlowerDNA {
   rotation: number;  // Y-axis rotation in radians (0 to 2π)
 }
 
+// Legacy DecayDNA — kept for reference, replaced by FallenBloomDNA
 export interface DecayDNA {
   name: string;
   description: string;
+  size: number;
+  aspectRatio: number;
+  edgeWobble: number;
+  layer1Color: string;
+  layer2Color: string;
+  layer3Color: string;
+  crackCount: number;
+  crackWobble: number;
+  crack1Color: string;
+  crack2Color: string;
+  crack3Color: string;
+}
 
-  // Size & Shape
-  size: number;              // Base diameter - scales width, not height
-  aspectRatio: number;       // 1 = circular, >1 = elongated horizontally
-  edgeWobble: number;        // 0-1, how irregular the edges are
+export interface FallenBloomDNA {
+  name: string;
+  description: string;
 
-  // Layer Colors (emotion-mapped)
-  // Layer 1 = innermost/top, Layer 3 = outermost/bottom
-  layer1Color: string;       // Primary emotion
-  layer2Color: string;       // Secondary emotion (defaults to layer1 if absent)
-  layer3Color: string;       // Tertiary emotion (defaults to layer1 if absent)
+  // Shape (fixed defaults, variation system can adjust later)
+  petalLength: number;       // 0.2-0.5
+  petalWidth: number;        // 0.1-0.25
+  stemLength: number;        // 0.2-0.6
+  leafSize: number;          // 0.3-1.0
+  scale: number;             // 0.4-1.8 (from percentile, may be fixed later)
 
-  // Crack Configuration
-  crackCount: number;        // Number of radiating cracks (4-12 range)
-  crackWobble: number;       // 0-1, how much zig-zag in the cracks
-  crack1Color: string;       // Primary association
-  crack2Color: string;       // Secondary association (defaults to crack1 if absent)
-  crack3Color: string;       // Tertiary association (defaults to crack1 if absent)
+  // Decay progression (fixed aesthetic for all decays)
+  decayAmount: number;       // 0-1: master decay look (gradient, darkening, curl, fray)
+  frayAmount: number;        // 0-2, scales with valence intensity
+  frayDensity: number;       // 0-1, fixed at max for data-driven use
+
+  // Colors (same encoding as flower system)
+  petalColors: string[];     // Emotion colors [E0] or [E0,E1] or [E0,E1,E2]
+  stemColors: string[];      // Association colors [A0] or [A0,A1] or [A0,A1,A2]
+
+  // Per-instance randomization
+  seed: number;              // From entry timestamp for reproducibility
+  rotation: number;          // Y-axis rotation (0-2π)
 }
 
 export interface SproutDNA {
@@ -96,4 +115,4 @@ export type PlantType = 'flower' | 'sprout' | 'decay';
 export type PlantDNA =
   | { type: 'flower'; dna: FlowerDNA }
   | { type: 'sprout'; dna: SproutDNA }
-  | { type: 'decay'; dna: DecayDNA };
+  | { type: 'decay'; dna: FallenBloomDNA };

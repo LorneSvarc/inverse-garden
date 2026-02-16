@@ -79,10 +79,10 @@ scale = minScale + |valence| × (maxScale - minScale)
 - [x] Update scale ranges (widened for visual distinction)
   - Flowers: 0.4 - 1.8
   - Sprouts: 0.8 - 1.0
-  - Decays: 0.4 - 1.8
+  - Decays: 1.0 - 3.6 (updated Phase 4C — scale as primary valence signal)
 - [x] Fixed Safari timestamp parsing (ISO 8601 conversion)
 - [ ] **REVISIT:** Flower scale tuning - low percentile flowers (0-10%) still look similar; may need further range adjustment or non-linear curve
-- [ ] **REVISIT:** Decay scale validation - need to test with diverse percentile samples (current sample only shows 0-1%)
+- [x] **RESOLVED:** Decay scale validation - connected to percentile system with 1.0-3.6 range (see Phase 4C)
 
 **Completed:** 2025-01-19
 
@@ -304,11 +304,75 @@ Before implementing the full lighting system, we need to explore and validate th
 
 ---
 
+### Phase 4C: FallenBloom (Decay) Redesign ✅ COMPLETE
+
+**Goal:** Replace flat-disc DecayDNA with organic fallen flower debris (FallenBloom3D) and establish a valence progression system.
+
+**Problem Statement:** Decay plants represent positive emotions (Slightly Pleasant, Pleasant, Very Pleasant). Valence must be visually distinguishable — this is the core requirement of the project. Previous decay (flat layered discs with cracks) didn't read as organic or plantlike.
+
+**Approach Iterations:**
+Multiple progression approaches were explored and rejected:
+- **Curl-proportional spread:** Wider petal spread with more curl → petals clipped through each other and stem
+- **Fragmentation:** More pieces for higher valence → conflicts with petal count encoding emotions
+- **Surface detail progression (fray, curl, darkening):** Narrow usable range (~0.5-0.7) before shapes become unrecognizable
+- **Discrete stages:** Continuous percentile doesn't map cleanly to discrete visual stages
+- **Arrangement progression (orderly→chaotic):** Random disorder doesn't read as meaningful
+
+**Final Decision: Scale as primary + fixed decay aesthetic**
+- All decay plants share the same fixed "fallen" look (decayAmount locked at 0.55 sweet spot)
+- Scale is the primary valence signal: bigger = more intense positive emotion (1.0-3.6 range)
+- This mirrors how flowers work (bigger = more intense negative emotion)
+
+**Implementation:**
+
+- [x] Replace old DecayDNA/Decay3D with FallenBloomDNA/FallenBloom3D
+  - BufferGeometry parametric grid (12×16 vertices) for reliable deformation
+  - Card-deck petal layout (fanStep=0.18 rad, offsetPerPetal=0.04, yGap=0.005)
+  - Half-cylinder stem, half-leaf system matching flower color encoding
+  - **Implementation:** `garden/src/components/FallenBloom3D.tsx`
+- [x] `decayAmount` master prop driving curl, fray, gradient, and vertex darkening
+  - `effectiveCurl = curlAmount ?? Math.min(0.30, decayAmount * 0.30)`
+  - `effectiveFray = frayAmount ?? decayAmount * 2.0`
+  - Curl only works in concert with fray (user-identified constraint)
+- [x] Decay toon gradient system
+  - `getDecayToonGradient(decayAmount)` in toonGradient.ts
+  - Interpolates 4-band gradient from normal (64/128/200/255) to harsh (40/100/160/160)
+  - Cached by quantized decayAmount (0.05 steps, max 20 DataTextures)
+- [x] Vertex edge/tip darkening
+  - Per-vertex color attribute on petal geometry
+  - Edge darkening zone: edgeness > 0.5, tip zone: v > 0.6
+  - Darkens toward (0.5, 0.35, 0.25) brown tones scaled by decayAmount
+- [x] Scale connected to percentile system
+  - Decay scale range: 1.0 - 3.6 (was hardcoded at 3.6 for testing)
+  - `calculateScaleFromPercentile(entry.scalePercentile, 'decay')`
+- [x] Fixed decayAmount (0.55) for all decay plants in DNA pipeline
+- [x] FallenBloomGenerator test scene (`?test=fallenbloom`)
+  - Decay slider, color presets, real-time parameter tuning
+
+**Known Issues / Future Improvements:**
+- Multi-petal clipping: petals in card-deck layout still poke through each other, especially with curl
+- Decay aesthetic sweet spot (0.55) is an improvement but may need further tuning
+- Could explore: opacity, ground stains, emissive glow, animation as additional decay channels
+- Scale as valence signal means bigger decay = fuller garden even when mood is positive — darkening helps but needs validation at scale
+
+**Files Modified/Created:**
+- `garden/src/components/FallenBloom3D.tsx` — New 3D component (~521 lines)
+- `garden/src/components/FallenBloomGenerator.tsx` — Test scene with controls
+- `garden/src/utils/toonGradient.ts` — Added `getDecayToonGradient()` with cache
+- `garden/src/utils/dnaMapper.ts` — `buildFallenBloomDNA()`, scale range 1.0-3.6, fixed decayAmount
+- `garden/src/types.ts` — `FallenBloomDNA` interface with `decayAmount` field
+- `garden/src/App.tsx` — Passes `decayAmount` to FallenBloom3D
+
+**Completed:** 2025-02-16
+
+---
+
 ## Reference Paths
 
 ```
 /Mood Garden Build/
-├── inverse-garden-gdd-v3.3.md           # THE SPEC - read this first
+├── docs/inverse-garden-gdd-v3.3.md       # THE SPEC - read this first
+├── Archived GDDs/inverse-garden-gdd-v3.2.md
 ├── TASKS.md                              # This file
 ├── inverse-garden-emotion-colors.html    # Color reference
 ├── inverse-garden-association-colors.html
@@ -320,7 +384,23 @@ Before implementing the full lighting system, we need to explore and validate th
 │   │   └── Decay3D.tsx
 │   └── types.ts
 └── garden/                               # The React Three Fiber app
-    ├── src/                              # Source code
+    ├── src/
+    │   ├── components/
+    │   │   ├── CleanToonFlower3D.tsx      # Main flower component (cel-shaded)
+    │   │   ├── CleanToonSprout3D.tsx      # Main sprout component (cel-shaded)
+    │   │   ├── FallenBloom3D.tsx          # Main decay component (BufferGeometry)
+    │   │   ├── FallenBloomGenerator.tsx   # Decay test scene (?test=fallenbloom)
+    │   │   └── environment/              # Sky, clouds, lighting, ground, LED wall
+    │   ├── utils/
+    │   │   ├── csvParser.ts              # CSV → MoodEntry parsing
+    │   │   ├── dnaMapper.ts              # Entry → DNA conversion
+    │   │   ├── percentileCalculator.ts   # Percentile-based scale ranking
+    │   │   ├── positionCalculator.ts     # Spiral+scatter spatial layout
+    │   │   ├── gardenLevel.ts            # Cumulative emotional state
+    │   │   ├── plantFading.ts            # Opacity/saturation fade system
+    │   │   └── toonGradient.ts           # Shared toon + decay gradient textures
+    │   ├── types.ts                      # FlowerDNA, SproutDNA, FallenBloomDNA
+    │   └── App.tsx                       # Main scene with full pipeline
     └── public/mood-data.csv              # Data copy for browser
 ```
 
@@ -678,3 +758,44 @@ Created procedural flower growth animation with overlapping phases:
 - 23 days with only Momentary Emotion entries
 - 1 day with no entries (Oct 17)
 - Plants spawn at exact logged timestamp (full datetime precision)
+
+### 2025-02-16 - FallenBloom Decay Redesign (Phase 4C)
+
+**Goal:** Replace flat-disc decay with organic fallen flower debris and find a valence progression system.
+
+**FallenBloom3D Component (`garden/src/components/FallenBloom3D.tsx`):**
+- Custom BufferGeometry parametric grid (12×16 vertices) for each petal
+- Card-deck petal layout: 1-3 petals stacked with slight fan and offset
+- Half-cylinder stem with optional half-leaf attachments
+- Color encoding matches flower system: emotions → petals, associations → stem/leaves
+
+**Decay Progression — Extensive Exploration:**
+Multiple approaches tried and rejected over several sessions:
+1. Curl-proportional spread → petals clip through each other and stem
+2. Fragmentation → conflicts with petal count = emotion count encoding
+3. Surface detail progression (fray, curl, darkening) → narrow usable range before shapes break
+4. Discrete stages → continuous percentile doesn't map cleanly to stages
+5. Arrangement disorder → random mess, not meaningful
+
+**Key Insight:** Surface-detail effects hit a wall around 0.5-0.7 decayAmount — shapes quickly become unrecognizable or look like computer graphics breaking down rather than organic decay.
+
+**Final Approach: Scale as primary valence signal + fixed decay look**
+- All decays share the same `decayAmount: 0.55` (the sweet spot where gradient/darkening/curl look convincing)
+- Scale is the primary valence channel: 1.0 (low valence) to 3.6 (high valence)
+- This mirrors how flowers already work (bigger = more intense)
+
+**Decay Visual Effects (all driven by fixed decayAmount):**
+- Decay toon gradient: darker 4-band gradient (getDecayToonGradient in toonGradient.ts)
+- Vertex edge/tip darkening: brown tones at petal edges and tips
+- Curl: edges curl upward (max 0.30)
+- Fray: edge notches for organic broken-petal look
+
+**Status:** Improvement over previous iterations. Further parameter tuning and exploration of additional channels (opacity, ground stains, animation) may be needed but deferred to move forward with other work.
+
+**Files Modified:**
+- `FallenBloom3D.tsx` — New component (~521 lines), BufferGeometry petal system
+- `FallenBloomGenerator.tsx` — Test scene with decay slider and color presets
+- `toonGradient.ts` — Added decay gradient with DataTexture cache
+- `dnaMapper.ts` — Scale 1.0-3.6 from percentile, fixed decayAmount 0.55
+- `types.ts` — FallenBloomDNA interface with decayAmount field
+- `App.tsx` — Wired decayAmount through to FallenBloom3D

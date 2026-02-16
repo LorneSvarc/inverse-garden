@@ -38,10 +38,14 @@ const COLOR_PRESETS: Record<
 // ─── Config ─────────────────────────────────────────────────────────────────
 
 interface GeneratorConfig {
+  decayAmount: number;
   petalLength: number;
   petalWidth: number;
   stemLength: number;
   leafSize: number;
+  frayAmount: number;
+  frayDensity: number;
+  curlAmount: number;
   scale: number;
   opacity: number;
   saturation: number;
@@ -57,11 +61,15 @@ interface GeneratorConfig {
 }
 
 const DEFAULT_CONFIG: GeneratorConfig = {
+  decayAmount: 0.5,
   petalLength: 0.35,
   petalWidth: 0.18,
   stemLength: 0.35,
   leafSize: 0.5,
-  scale: 0.8,
+  frayAmount: 0.3,
+  frayDensity: 0.4,
+  curlAmount: 0.3,
+  scale: 1.2,
   opacity: 1.0,
   saturation: 1.0,
 
@@ -216,6 +224,16 @@ export default function FallenBloomGenerator() {
         </div>
         <div style={{ color: '#666', marginBottom: '8px' }}>?test=fallenbloom &mdash; scattered debris</div>
 
+        {/* Decay Progression (master control) */}
+        <div style={sectionStyle}>
+          <div style={sectionTitleStyle}>Decay Progression</div>
+          <Slider label="Decay" value={config.decayAmount} min={0} max={1} step={0.05}
+            onChange={(v) => update({ decayAmount: v })} />
+          <div style={{ color: '#555', fontSize: '10px', marginTop: '2px' }}>
+            Drives curl ({Math.min(0.30, config.decayAmount * 0.30).toFixed(2)}) + fray ({(config.decayAmount * 2.0).toFixed(1)})
+          </div>
+        </div>
+
         {/* Petal Geometry */}
         <div style={sectionStyle}>
           <div style={sectionTitleStyle}>Petal Shape</div>
@@ -223,6 +241,8 @@ export default function FallenBloomGenerator() {
             onChange={(v) => update({ petalLength: v })} />
           <Slider label="Width" value={config.petalWidth} min={0.1} max={0.25} step={0.05}
             onChange={(v) => update({ petalWidth: v })} />
+          <Slider label="Fray Density" value={config.frayDensity} min={0.1} max={0.8} step={0.05}
+            onChange={(v) => update({ frayDensity: v })} />
         </div>
 
         {/* Stem & Leaves */}
@@ -312,10 +332,12 @@ export default function FallenBloomGenerator() {
 
         <FallenBloom3D
           seed={42}
+          decayAmount={config.decayAmount}
           petalLength={config.petalLength}
           petalWidth={config.petalWidth}
           stemLength={config.stemLength}
           leafSize={config.leafSize}
+          frayDensity={config.frayDensity}
           scale={config.scale}
           petalColors={activeColors.petalColors}
           stemColors={activeColors.stemColors}
