@@ -30,6 +30,7 @@ export interface FallenBloom3DProps {
   saturation?: number;
   position?: [number, number, number];
   rotation?: number;       // Y-axis rotation in radians (0-2π)
+  onClick?: (e: any) => void;
 }
 
 // ─── Seeded Random (mild jitter only) ───────────────────────────────────────
@@ -70,6 +71,7 @@ const FallenBloom3D: React.FC<FallenBloom3DProps> = ({
   saturation = 1,
   position,
   rotation = 0,
+  onClick,
 }) => {
   // Derive curl and fray from decayAmount (can be overridden by explicit props)
   const effectiveCurl = curlAmount ?? Math.min(0.30, decayAmount * 0.30);
@@ -448,7 +450,7 @@ const FallenBloom3D: React.FC<FallenBloom3DProps> = ({
   );
 
   return (
-    <group position={position} rotation={[0, rotation, 0]}>
+    <group position={position} rotation={[0, rotation, 0]} onClick={onClick}>
     <group scale={[scale, scale, scale]}>
       {/* ── Petals: flat stacked deck of cards ── */}
       {layout.petalLayouts.map((p, i) => {

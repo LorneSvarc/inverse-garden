@@ -86,10 +86,14 @@ export function calculatePercentiles(entries: MoodEntry[]): MoodEntryWithPercent
     console.log('Sample classifications:', entries.slice(0, 5).map(e => e.valenceClassification));
   }
 
+  // Only plant-spawning entries participate in percentile ranking
+  // Daily Mood entries control atmosphere + garden level, not plant spawning (per GDD)
+  const plantEntries = entries.filter(e => e.kind !== 'Daily Mood');
+
   // Separate by component type
-  const flowers = entries.filter(e => isFlower(e.valenceClassification));
-  const decays = entries.filter(e => isDecay(e.valenceClassification));
-  const sprouts = entries.filter(e => isNeutral(e.valenceClassification));
+  const flowers = plantEntries.filter(e => isFlower(e.valenceClassification));
+  const decays = plantEntries.filter(e => isDecay(e.valenceClassification));
+  const sprouts = plantEntries.filter(e => isNeutral(e.valenceClassification));
 
   // Log distribution for debugging
   console.log(`Percentile calculation: ${flowers.length} flowers, ${sprouts.length} sprouts, ${decays.length} decays`);
@@ -104,12 +108,18 @@ export function calculatePercentiles(entries: MoodEntry[]): MoodEntryWithPercent
     scalePercentile: 50,
   }));
 
+  // Daily Mood entries get default percentile (they don't spawn plants)
+  const dailyMoodEntries: MoodEntryWithPercentile[] = entries
+    .filter(e => e.kind === 'Daily Mood')
+    .map(e => ({ ...e, scalePercentile: 50 }));
+
   // Combine all entries back together
   // Note: Order doesn't matter here since we'll look them up by ID later
   return [
     ...flowersWithPercentile,
     ...decaysWithPercentile,
     ...sproutsWithPercentile,
+    ...dailyMoodEntries,
   ];
 }
 

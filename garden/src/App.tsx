@@ -113,18 +113,20 @@ function Plant({
   plantDNA,
   position,
   opacity,
-  saturation
+  saturation,
+  onClick,
 }: {
   plantDNA: PlantDNA;
   position: [number, number, number];
   opacity: number;
   saturation: number;
+  onClick?: (e: any) => void;
 }) {
   switch (plantDNA.type) {
     case 'flower':
-      return <CleanToonFlower3D dna={plantDNA.dna} position={position} opacity={opacity} saturation={saturation} />;
+      return <CleanToonFlower3D dna={plantDNA.dna} position={position} opacity={opacity} saturation={saturation} onClick={onClick} />;
     case 'sprout':
-      return <CleanToonSprout3D dna={plantDNA.dna} position={position} opacity={opacity} saturation={saturation} />;
+      return <CleanToonSprout3D dna={plantDNA.dna} position={position} opacity={opacity} saturation={saturation} onClick={onClick} />;
     case 'decay':
       return (
         <FallenBloom3D
@@ -143,6 +145,7 @@ function Plant({
           saturation={saturation}
           position={position}
           rotation={plantDNA.dna.rotation}
+          onClick={onClick}
         />
       );
   }
@@ -408,6 +411,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false); // Start collapsed for timeline view
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
   // Environment state
   const [sunMesh, setSunMesh] = useState<THREE.Mesh | null>(null);
@@ -449,9 +453,10 @@ function App() {
         const bounds = getTimeBounds(sortedEntries);
         console.log('Time bounds:', bounds.earliest, 'to', bounds.latest);
 
-        // Calculate stable positions for all entries (done once at load time)
-        const { positions: calculatedPositions, patches } = calculatePositionsWithDebug(sortedEntries);
-        console.log(`Calculated positions for ${calculatedPositions.size} entries across ${patches.length} patches`);
+        // Only calculate positions for plant-spawning entries (not Daily Mood)
+        const plantEntries = sortedEntries.filter(entry => entry.kind !== 'Daily Mood');
+        const { positions: calculatedPositions, patches } = calculatePositionsWithDebug(plantEntries);
+        console.log(`Calculated positions for ${calculatedPositions.size} plant entries across ${patches.length} patches (${sortedEntries.length - plantEntries.length} Daily Mood entries excluded)`);
 
         setAllEntries(sortedEntries);
         setPositions(calculatedPositions);
@@ -560,10 +565,13 @@ function App() {
   const [smoothedMood, setSmoothedMood] = useState(0);
 
   // Filter entries that have been created by current time
+  // Daily Mood entries control atmosphere + garden level only, not plant spawning (per GDD)
   // (they may still be visible even if fading)
   const createdEntries = useMemo(() => {
     if (!currentTime) return [];
-    return allEntries.filter(entry => entry.timestamp <= currentTime);
+    return allEntries.filter(entry =>
+      entry.timestamp <= currentTime && entry.kind !== 'Daily Mood'
+    );
   }, [allEntries, currentTime]);
 
   // Calculate fade state for each created entry
@@ -656,10 +664,53 @@ function App() {
         </div>
         {panelOpen && (
           <div className="panel-content">
+            {/* Selected plant details (click a plant in the garden) */}
+            {selectedEntryId && (() => {
+              const entry = allEntries.find(e => e.id === selectedEntryId);
+              if (!entry) return null;
+              const plantType = getPlantType(entry.valenceClassification);
+              const dna = entryToDNA(entry);
+              return (
+                <div style={{
+                  padding: '8px',
+                  marginBottom: '8px',
+                  background: 'rgba(255,255,255,0.1)',
+                  borderRadius: '6px',
+                  borderLeft: '3px solid #4fc3f7',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ fontSize: '13px' }}>Selected: {plantType}</strong>
+                    <span
+                      style={{ cursor: 'pointer', opacity: 0.5, fontSize: '11px' }}
+                      onClick={() => setSelectedEntryId(null)}
+                    >✕ clear</span>
+                  </div>
+                  <div style={{ fontSize: '11px', marginTop: '4px', lineHeight: '1.6' }}>
+                    <div><span className="label">Date:</span> {entry.timestamp.toLocaleDateString()} {entry.timestamp.toLocaleTimeString()}</div>
+                    <div><span className="label">Kind:</span> {entry.kind}</div>
+                    <div><span className="label">Emotions:</span> {entry.emotions.length > 0 ? entry.emotions.join(', ') : '(none)'}</div>
+                    <div><span className="label">Associations:</span> {entry.associations.length > 0 ? entry.associations.join(', ') : '(none)'}</div>
+                    <div><span className="label">Valence:</span> {entry.valence.toFixed(2)} ({entry.valenceClassification})</div>
+                    <div><span className="label">Scale Percentile:</span> {entry.scalePercentile.toFixed(0)}%</div>
+                    {dna.type === 'decay' && (
+                      <div><span className="label">Decay Scale:</span> {dna.dna.scale.toFixed(2)}</div>
+                    )}
+                    {dna.type === 'flower' && (
+                      <div><span className="label">Flower Scale:</span> {dna.dna.scale.toFixed(2)}</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
             <p>Showing {visiblePlants.length} of {allEntries.length} entries (created: {createdEntries.length})</p>
             <ul>
               {visibleEntries.slice(-10).reverse().map((entry, i) => (
-                <li key={entry.id}>
+                <li
+                  key={entry.id}
+                  style={entry.id === selectedEntryId ? { background: 'rgba(79,195,247,0.15)', borderRadius: '4px', padding: '2px 4px' } : undefined}
+                  onClick={() => setSelectedEntryId(entry.id)}
+                >
                   <strong>{visiblePlants[visibleEntries.length - 1 - i]?.type}</strong>
                   <span className="entry-date">
                     {entry.timestamp.toLocaleDateString()}
@@ -726,6 +777,22 @@ function App() {
               position={getPosition(entry.id)}
               opacity={fadeState.opacity}
               saturation={fadeState.saturation}
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedEntryId(entry.id);
+                setPanelOpen(true);
+                console.log('🌿 Plant clicked:', {
+                  type: plantDNA.type,
+                  id: entry.id,
+                  date: entry.timestamp.toLocaleDateString(),
+                  time: entry.timestamp.toLocaleTimeString(),
+                  emotions: entry.emotions,
+                  associations: entry.associations,
+                  valence: entry.valence,
+                  classification: entry.valenceClassification,
+                  percentile: entry.scalePercentile,
+                });
+              }}
             />
           );
         })}

@@ -367,6 +367,53 @@ Multiple progression approaches were explored and rejected:
 
 ---
 
+### Phase 5: Data Pipeline Fixes + Visual Debugging ✅ COMPLETE
+
+**Goal:** Fix critical data classification bug where Daily Mood entries were incorrectly spawning as plants, fix white fallback colors, and add click-to-identify debugging.
+
+**Problem Statement:** User discovered via click-to-identify that:
+1. ~66 Daily Mood entries were rendering as plants (flowers/sprouts/decays) when per GDD they should ONLY control atmosphere (clouds, floor glow, fog) and contribute to garden level
+2. Plants with no emotions had white (#FFFFFF) petals — invisible against toon lighting
+3. Community association was mapped to white (#FFFFFF) — invisible stems
+4. A specific Daily Mood flower (2025-11-08 10pm) was constantly flickering
+
+User: *"This error calls into question the accuracy of every plant in the project"*
+
+**Fixes Implemented:**
+
+- [x] Filter Daily Mood from plant pipeline (3 locations):
+  - `percentileCalculator.ts`: Daily Mood excluded from percentile ranking groups (still returned with default percentile for allEntries compatibility)
+  - `App.tsx` position calculation: Daily Mood entries excluded from `calculatePositionsWithDebug()`
+  - `App.tsx` createdEntries: `entry.kind !== 'Daily Mood'` filter added
+- [x] Preserved Daily Mood behavior for atmosphere + garden level:
+  - `moodValence` still uses allEntries (filters for Daily Mood internally) ✓
+  - `gardenLevel` still uses allEntries (Daily Mood valence contributes) ✓
+  - `valenceText` and `timeBounds` still use allEntries ✓
+- [x] Fallback emotion color: #FFFFFF → #9CA3AF (medium grey, visible)
+- [x] Community association color: #FFFFFF → #C8D6E5 (light steel blue, visible)
+- [x] Bloom disabled (diagnostic confirmed: removed glow halo but plants still white → bloom wasn't the cause)
+- [x] Toon gradient highlight band: 255 → 210 (did not fix whiteness but minor improvement retained)
+- [x] Click-to-identify debug feature: onClick on all plant components → info panel + console.log
+
+**Also in this phase (diagnostic/debug):**
+- Added `onClick` prop to CleanToonFlower3D, CleanToonSprout3D, FallenBloom3D
+- Added `selectedEntryId` state + selected plant detail card in info panel
+- List items in panel are clickable to highlight
+
+**Files Modified:**
+- `garden/src/utils/percentileCalculator.ts` — Daily Mood filter + dailyMoodEntries return
+- `garden/src/utils/dnaMapper.ts` — Fallback color #FFFFFF→#9CA3AF, Community #FFFFFF→#C8D6E5
+- `garden/src/utils/toonGradient.ts` — Highlight band 255→210, decay gradient formula updated
+- `garden/src/components/environment/PostProcessing.tsx` — Bloom disabled (commented out)
+- `garden/src/components/CleanToonFlower3D.tsx` — onClick prop added
+- `garden/src/components/CleanToonSprout3D.tsx` — onClick prop added
+- `garden/src/components/FallenBloom3D.tsx` — onClick prop added
+- `garden/src/App.tsx` — Daily Mood filter (positions + createdEntries), selectedEntryId state, click wiring, info panel update
+
+**Completed:** 2025-02-16
+
+---
+
 ## Reference Paths
 
 ```
@@ -799,3 +846,31 @@ Multiple approaches tried and rejected over several sessions:
 - `dnaMapper.ts` — Scale 1.0-3.6 from percentile, fixed decayAmount 0.55
 - `types.ts` — FallenBloomDNA interface with decayAmount field
 - `App.tsx` — Wired decayAmount through to FallenBloom3D
+
+### 2025-02-16 - Data Pipeline Fix: Daily Mood Classification + White Colors (Phase 5)
+
+**Goal:** Fix critical data classification bug and white fallback colors.
+
+**Root Cause Discovery:**
+Using click-to-identify debug tool, discovered Daily Mood entries were incorrectly spawning as plants. Per GDD, Daily Mood should only control atmosphere (clouds, floor, fog) and garden level. ~66 Daily Mood entries were rendering as flowers/sprouts/decays, corrupting the garden's accuracy.
+
+**Fixes Applied:**
+1. Filtered Daily Mood from percentile calculation, position calculation, and plant creation pipeline
+2. Changed fallback emotion color from #FFFFFF (white) to #9CA3AF (grey)
+3. Changed Community association from #FFFFFF to #C8D6E5 (light steel blue)
+4. Bloom disabled after diagnostic confirmed it was adding glow but not needed
+5. Toon gradient highlight band lowered 255→210
+
+**Debug Feature Added:**
+- Click-to-identify: onClick on all plant components → shows entry details in info panel + console.log
+- Helped diagnose all three issues above
+
+**Verified Preserved:**
+- `moodValence` still correctly reads Daily Mood entries for atmosphere
+- `gardenLevel` still uses all entries for plant fade rates
+- Pre-compute average of momentary entries for missing Daily Mood days still works
+
+**Files Modified:**
+- `percentileCalculator.ts`, `dnaMapper.ts`, `toonGradient.ts`, `PostProcessing.tsx`
+- `CleanToonFlower3D.tsx`, `CleanToonSprout3D.tsx`, `FallenBloom3D.tsx` (onClick)
+- `App.tsx` (Daily Mood filters, click-to-identify UI)

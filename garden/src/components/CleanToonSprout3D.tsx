@@ -10,6 +10,7 @@ interface CleanToonSprout3DProps {
   position?: [number, number, number];
   opacity?: number;
   saturation?: number;
+  onClick?: (e: any) => void;
 }
 
 /**
@@ -73,7 +74,8 @@ const CleanToonSprout3D: React.FC<CleanToonSprout3DProps> = ({
   dna,
   position = [0, 0, 0],
   opacity = 1,
-  saturation = 1
+  saturation = 1,
+  onClick,
 }) => {
   const groupRef = useRef<THREE.Group>(null!);
   const budRef = useRef<THREE.Group>(null!);
@@ -186,7 +188,7 @@ const CleanToonSprout3D: React.FC<CleanToonSprout3DProps> = ({
   }, [budRadius, budHeight, dna.budPointiness]);
 
   return (
-    <group position={position}>
+    <group position={position} onClick={onClick}>
       <group ref={groupRef} scale={[dna.scale, dna.scale, dna.scale]} position={[0, groupY, 0]}>
         {/* Stem */}
         <mesh castShadow>

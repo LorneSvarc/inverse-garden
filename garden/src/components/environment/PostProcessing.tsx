@@ -97,14 +97,14 @@ export const PostProcessing: React.FC<PostProcessingProps> = ({
         />
       )}
 
-      {/* Bloom - enhanced for radiant, reduced for gloomy */}
-      <Bloom
+      {/* Bloom - DISABLED for diagnostic: testing if bloom causes plant white-out */}
+      {/* <Bloom
         intensity={adjustedBloomIntensity}
         luminanceThreshold={bloomThreshold}
         luminanceSmoothing={0.95}
         radius={bloomRadius}
         blendFunction={BlendFunction.ADD}
-      />
+      /> */}
 
       {/* Saturation adjustment - key for weather feeling */}
       <HueSaturation

@@ -9,7 +9,7 @@ function createToonGradientTexture(): THREE.DataTexture {
     64, 64, 64, 255,    // Dark band
     128, 128, 128, 255, // Mid band
     200, 200, 200, 255, // Light band
-    255, 255, 255, 255, // Highlight band
+    210, 210, 210, 255, // Highlight band (was 255 — pure white washed out plant colors)
   ]);
   const texture = new THREE.DataTexture(colors, 4, 1, THREE.RGBAFormat);
   texture.minFilter = THREE.NearestFilter;
@@ -47,7 +47,7 @@ function createDecayGradientTexture(decayAmount: number): THREE.DataTexture {
   const dark = Math.round(64 - t * 24);       // 64 → 40
   const mid = Math.round(128 - t * 28);       // 128 → 100
   const light = Math.round(200 - t * 40);     // 200 → 160
-  const highlight = Math.round(255 - t * 95); // 255 → 160 (kills the bright highlight)
+  const highlight = Math.round(210 - t * 50); // 210 → 160 (matches normal gradient cap, converges to dead/matte)
 
   const colors = new Uint8Array([
     dark, dark, dark, 255,

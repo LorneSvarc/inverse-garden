@@ -71,7 +71,7 @@ const ASSOCIATION_COLORS: Record<string, string> = {
   'Partner': '#FFB6C1',      // Light pink
   'Family': '#00FF7F',       // Spring green
   'Friends': '#E0FFFF',      // Light cyan
-  'Community': '#FFFFFF',    // White
+  'Community': '#C8D6E5',    // Light steel blue (visible, distinct from white)
   'Work': '#DAA520',         // Goldenrod
   'Tasks': '#708090',        // Slate gray
   'Identity': '#9370DB',     // Medium purple
@@ -81,7 +81,7 @@ const ASSOCIATION_COLORS: Record<string, string> = {
 };
 
 // Fallback colors for missing data
-const FALLBACK_EMOTION_COLOR = '#FFFFFF';     // White
+const FALLBACK_EMOTION_COLOR = '#9CA3AF';     // Medium grey (visible, signals "no emotion")
 const FALLBACK_CENTER_COLOR = '#FFD700';      // Bright yellow
 const FALLBACK_ASSOCIATION_COLOR = '#FFD700'; // Bright yellow
 

@@ -10,6 +10,7 @@ interface CleanToonFlower3DProps {
   position?: [number, number, number];
   opacity?: number;
   saturation?: number;
+  onClick?: (e: any) => void;
 }
 
 /**
@@ -112,7 +113,8 @@ const CleanToonFlower3D: React.FC<CleanToonFlower3DProps> = ({
   dna,
   position = [0, 0, 0],
   opacity = 1,
-  saturation = 1
+  saturation = 1,
+  onClick,
 }) => {
   const gradientMap = useMemo(() => getToonGradient(), []);
 
@@ -202,7 +204,7 @@ const CleanToonFlower3D: React.FC<CleanToonFlower3DProps> = ({
   }, [dna.petalCount, dna.petalRows]);
 
   return (
-    <group position={position}>
+    <group position={position} onClick={onClick}>
       <group scale={[dna.scale, dna.scale, dna.scale]} rotation={[0, dna.rotation, 0]}>
         {/* Stem */}
         <mesh castShadow>
