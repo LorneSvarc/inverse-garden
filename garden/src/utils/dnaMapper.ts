@@ -40,7 +40,7 @@ const EMOTION_COLORS: Record<string, string> = {
   'Indifferent': '#DFFF00',  // Chartreuse
 
   // Positive Emotions (Muted - appear on Decays)
-  'Content': '#9CA3AF',      // Grey
+  'Content': '#6B7280',      // Medium-dark grey (visible under toon lighting)
   'Satisfied': '#64748B',    // Slate grey
   'Happy': '#4B5563',        // Dark grey
   'Joyful': '#1F2937',       // Near black
@@ -81,7 +81,7 @@ const ASSOCIATION_COLORS: Record<string, string> = {
 };
 
 // Fallback colors for missing data
-const FALLBACK_EMOTION_COLOR = '#9CA3AF';     // Medium grey (visible, signals "no emotion")
+const FALLBACK_EMOTION_COLOR = '#6B7280';     // Medium-dark grey (matches Content, visible under toon lighting)
 const FALLBACK_CENTER_COLOR = '#FFD700';      // Bright yellow
 const FALLBACK_ASSOCIATION_COLOR = '#FFD700'; // Bright yellow
 

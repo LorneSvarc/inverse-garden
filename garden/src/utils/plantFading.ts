@@ -4,9 +4,13 @@ import { getGardenLevelFadeModifier } from './gardenLevel';
 /**
  * Plant Fading System
  *
- * Plants fade over time through two channels:
- * - Saturation: fades faster (vibrant → grey)
- * - Opacity: fades slower (solid → ghost → gone)
+ * Plants fade over time through opacity only:
+ * - Opacity decreases over lifespan (solid → ghost → gone)
+ * - Saturation stays at 1.0 (plants keep their color identity)
+ *
+ * Previously saturation also faded (faster than opacity), but this caused
+ * all plants to turn grey before disappearing — visually confusing because
+ * Content emotion IS grey. Now plants remain colorful until they fade out.
  *
  * Fade rate is modified by:
  * 1. Intensity (|valence|): higher intensity = slower fade
@@ -22,12 +26,9 @@ export const FADING_CONFIG = {
   // At max intensity, lifespan is multiplied by (1 + this value)
   intensityModifier: 0.5, // +50% lifespan at max intensity
 
-  // Saturation fades faster than opacity
-  // This is the multiplier on fade progress for saturation
-  saturationFadeSpeed: 1.5,
-
-  // Minimum saturation (plants don't go fully grey)
-  minSaturation: 0.0,
+  // Saturation fade DISABLED — plants keep their color identity as they age
+  // (Previously: saturationFadeSpeed: 1.5, minSaturation: 0.0)
+  // Disabled because grey-fading conflicted with Content emotion (which IS grey)
 
   // Minimum opacity before plant disappears
   minOpacity: 0.0,
@@ -122,14 +123,9 @@ export function calculateFadeState(
     1 - curvedProgress
   );
 
-  // Saturation fades faster (multiply progress by speed factor)
-  const saturationProgress = applyFadeCurve(
-    Math.min(1, linearProgress * FADING_CONFIG.saturationFadeSpeed)
-  );
-  const saturation = Math.max(
-    FADING_CONFIG.minSaturation,
-    1 - saturationProgress
-  );
+  // Saturation stays constant — plants keep their color identity as they fade
+  // (Previously faded faster than opacity, but grey plants conflicted with Content emotion)
+  const saturation = 1;
 
   // Plant is visible if opacity is above threshold
   const isVisible = opacity > FADING_CONFIG.minOpacity;

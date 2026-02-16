@@ -874,3 +874,26 @@ Using click-to-identify debug tool, discovered Daily Mood entries were incorrect
 - `percentileCalculator.ts`, `dnaMapper.ts`, `toonGradient.ts`, `PostProcessing.tsx`
 - `CleanToonFlower3D.tsx`, `CleanToonSprout3D.tsx`, `FallenBloom3D.tsx` (onClick)
 - `App.tsx` (Daily Mood filters, click-to-identify UI)
+
+### 2025-02-16 - Fading Fix: Opacity-Only + Content Grey Visibility (Phase 5A)
+
+**Goal:** Fix two visual issues discovered after Phase 5 data pipeline fixes.
+
+**Problem 1 — Saturation fade conflicted with Content emotion:**
+The fading system reduced saturation faster than opacity, causing all aging plants to turn grey before disappearing. This was visually confusing because Content (the most logged emotion) IS grey — you couldn't tell if a grey plant was Content-colored or just old.
+
+**Fix:** Changed to opacity-only fading. Plants keep full saturation and become transparent as they age instead of turning grey. Modified `plantFading.ts`: saturation always returns 1, removed `saturationFadeSpeed` and `minSaturation` from config.
+
+**Problem 2 — Content grey (#9CA3AF) appeared white under toon lighting:**
+The previous grey was RGB(156,163,175) — too light. Under toon material with highlight band ×0.82 and key light at 2.5π intensity, it washed to near-white and took on the color of the light.
+
+**Fix:** Darkened Content to `#6B7280` (RGB 107,114,128 — Tailwind gray-500). Under toon highlight, brightest face ≈ RGB(88,93,105) — clearly reads as grey. Updated `FALLBACK_EMOTION_COLOR` to match.
+
+**Color change chain (across Phase 5 + 5A):**
+- `FALLBACK_EMOTION_COLOR`: #FFFFFF → #9CA3AF → #6B7280
+- `Content` emotion: #9CA3AF → #6B7280
+- `Community` association: #FFFFFF → #C8D6E5
+
+**Files Modified:**
+- `garden/src/utils/plantFading.ts` — Saturation always 1, updated config and docstring
+- `garden/src/utils/dnaMapper.ts` — Content #9CA3AF→#6B7280, fallback #9CA3AF→#6B7280
