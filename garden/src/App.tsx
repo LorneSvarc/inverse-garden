@@ -92,6 +92,7 @@ function SmoothedMoodBridge({
   onUpdate: (smoothed: number) => void;
 }) {
   const currentRef = useRef(target);
+  const lastReportedRef = useRef(target);
 
   useFrame((_, delta) => {
     const current = currentRef.current;
@@ -100,7 +101,12 @@ function SmoothedMoodBridge({
     const smoothed = current + diff * (1 - Math.exp(-smoothingSpeed * delta));
     // Snap if very close (avoid floating point drift)
     currentRef.current = Math.abs(diff) < 0.001 ? target : smoothed;
-    onUpdate(currentRef.current);
+    // Only trigger React state update when value changes meaningfully (>0.01)
+    // This prevents 60fps re-renders of the entire component tree
+    if (Math.abs(currentRef.current - lastReportedRef.current) > 0.01) {
+      lastReportedRef.current = currentRef.current;
+      onUpdate(currentRef.current);
+    }
   });
 
   return null;
@@ -413,8 +419,7 @@ function App() {
   const [panelOpen, setPanelOpen] = useState(false); // Start collapsed for timeline view
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
-  // Environment state
-  const [sunMesh, setSunMesh] = useState<THREE.Mesh | null>(null);
+  // (sunMesh state removed — god rays removed)
 
   // Dev mode: ?dev=true enables tuning panel
   const isDevMode = useMemo(() => new URLSearchParams(window.location.search).get('dev') === 'true', []);
@@ -476,10 +481,13 @@ function App() {
   }, []);
 
   // Playback effect - advance time when playing
+  // NOTE: currentTime is NOT in the dependency array — it was causing the interval
+  // to be cleared and recreated every 100ms. The setCurrentTime updater function
+  // receives the previous value, so it doesn't need currentTime as a closure dep.
   useEffect(() => {
-    if (!isPlaying || !currentTime || !timeBounds) return;
+    if (!isPlaying || !timeBounds) return;
 
-    const intervalMs = 50; // Update every 50ms for smooth animation
+    const intervalMs = 50; // 50ms = 20 FPS prop updates for smooth sun/shadow movement. Cascade is cheap now thanks to quantized memo keys.
     const msPerDay = 24 * 60 * 60 * 1000;
     const baseAdvance = (playbackSpeed * msPerDay * intervalMs) / 1000;
 
@@ -504,33 +512,62 @@ function App() {
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [isPlaying, playbackSpeed, timeBounds, currentTime]);
+  }, [isPlaying, playbackSpeed, timeBounds]);
 
-  // Calculate garden level at current time
-  const gardenLevel = useMemo(() => {
+  // === QUANTIZED TIME KEYS ===
+  // The 50ms interval creates a new Date object every tick. These quantized
+  // values provide stable memo keys so downstream computations don't re-run
+  // unless something actually changed.
+
+  // Quantized to nearest minute (changes ~every 1-6 seconds of playback depending on speed)
+  // Used for: hour, gardenLevel
+  const currentTimeMinute = useMemo(() => {
     if (!currentTime) return 0;
+    return Math.floor(currentTime.getTime() / 60000); // ms → minutes
+  }, [currentTime]);
+
+  // Quantized to calendar day string (changes ~every few seconds of playback)
+  // Used for: moodValence, valenceText
+  const currentDayStr = useMemo(() => {
+    if (!currentTime) return '';
+    return currentTime.toDateString();
+  }, [currentTime]);
+
+  // Quantized to nearest 10 seconds (changes less often than every-50ms)
+  // Used for: createdEntries, fadeStates (need more precision than minute for fade)
+  const currentTime10s = useMemo(() => {
+    if (!currentTime) return 0;
+    return Math.floor(currentTime.getTime() / 10000); // ms → 10-second blocks
+  }, [currentTime]);
+
+  // Calculate garden level at current time — now keyed on minute, not every 50ms
+  const gardenLevel = useMemo(() => {
+    if (!currentTime || currentTimeMinute === 0) return 0;
     return calculateGardenLevel(allEntries, currentTime);
-  }, [allEntries, currentTime]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allEntries, currentTimeMinute]);
 
   // === DATA → ENVIRONMENT BRIDGE ===
 
   // Hour from currentTime (drives sun arc, sky colors, lighting)
+  // Keyed on minute — hour changes smoothly but only recomputes once per minute
   const hour = useMemo(() => {
-    if (!currentTime) return 12;
+    if (!currentTime || currentTimeMinute === 0) return 12;
     return currentTime.getHours() + currentTime.getMinutes() / 60;
-  }, [currentTime]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentTimeMinute]);
 
   // Daily mood valence — from Daily Mood entries on the current calendar day
   // Drives clouds, floor glow (outside bed), fog, atmospheric effects
   // Daily Mood applies to the WHOLE calendar day (not gated by log time)
+  // Keyed on day string — only changes when the calendar day changes
   const moodValence = useMemo(() => {
-    if (!currentTime || allEntries.length === 0) return 0;
-    const currentDay = currentTime.toDateString();
+    if (!currentDayStr || allEntries.length === 0) return 0;
 
     // First: use Daily Mood entry if one exists for this calendar day
     const dailyMoodEntries = allEntries.filter(e =>
       e.kind === 'Daily Mood' &&
-      e.timestamp.toDateString() === currentDay
+      e.timestamp.toDateString() === currentDayStr
     );
     if (dailyMoodEntries.length > 0) {
       const avg = dailyMoodEntries.reduce((sum, e) => sum + e.valence, 0) / dailyMoodEntries.length;
@@ -541,7 +578,7 @@ function App() {
     // Applied to whole day (same behavior as Daily Mood)
     const momentaryEntries = allEntries.filter(e =>
       e.kind === 'Momentary Emotion' &&
-      e.timestamp.toDateString() === currentDay
+      e.timestamp.toDateString() === currentDayStr
     );
     if (momentaryEntries.length > 0) {
       const avg = momentaryEntries.reduce((sum, e) => sum + e.valence, 0) / momentaryEntries.length;
@@ -549,15 +586,17 @@ function App() {
     }
 
     return 0; // No entries at all for this day
-  }, [allEntries, currentTime]);
+  }, [allEntries, currentDayStr]);
 
   // LED wall text: valence classification of most recent entry of any kind
+  // Keyed on 10-second blocks — text doesn't need millisecond precision
   const valenceText = useMemo(() => {
-    if (!currentTime) return 'NEUTRAL';
+    if (!currentTime || currentTime10s === 0) return 'NEUTRAL';
     const pastEntries = allEntries.filter(e => e.timestamp <= currentTime);
     if (pastEntries.length === 0) return 'NEUTRAL';
     return pastEntries[pastEntries.length - 1].valenceClassification.toUpperCase();
-  }, [allEntries, currentTime]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allEntries, currentTime10s]);
 
   // Effective values: dev override if set, otherwise data-derived
   const effectiveHour = devOverrides.hourOverride ?? hour;
@@ -566,17 +605,19 @@ function App() {
 
   // Filter entries that have been created by current time
   // Daily Mood entries control atmosphere + garden level only, not plant spawning (per GDD)
-  // (they may still be visible even if fading)
+  // Keyed on 10-second blocks — new plants don't appear that fast
   const createdEntries = useMemo(() => {
-    if (!currentTime) return [];
+    if (!currentTime || currentTime10s === 0) return [];
     return allEntries.filter(entry =>
       entry.timestamp <= currentTime && entry.kind !== 'Daily Mood'
     );
-  }, [allEntries, currentTime]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allEntries, currentTime10s]);
 
   // Calculate fade state for each created entry
+  // Keyed on 10-second blocks + gardenLevel (which itself is keyed on minute)
   const fadeStates = useMemo(() => {
-    if (!currentTime) return new Map<string, FadeState>();
+    if (!currentTime || currentTime10s === 0) return new Map<string, FadeState>();
     const states = new Map<string, FadeState>();
     for (const entry of createdEntries) {
       const plantType = getPlantType(entry.valenceClassification);
@@ -584,7 +625,8 @@ function App() {
       states.set(entry.id, fadeState);
     }
     return states;
-  }, [createdEntries, currentTime, gardenLevel]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createdEntries, currentTime10s, gardenLevel]);
 
   // Filter to only entries that are still visible (opacity > 0)
   const visibleEntries = useMemo(() => {
@@ -595,6 +637,7 @@ function App() {
   }, [createdEntries, fadeStates]);
 
   // Convert visible entries to DNA (memoized for performance)
+  // entryToDNA now has an internal cache, so this array creation is cheap
   const visiblePlants = useMemo(() => {
     return visibleEntries.map(entryToDNA);
   }, [visibleEntries]);
@@ -763,7 +806,6 @@ function App() {
           shadowsEnabled={devOverrides.shadowsEnabled}
           fogDensity={devOverrides.fogDensity}
           cloudsEnabled={devOverrides.cloudsEnabled}
-          onSunMeshReady={setSunMesh}
         />
 
         {/* Plants */}
@@ -809,8 +851,6 @@ function App() {
           bloomRadius={0.7}
           vignetteStrength={devOverrides.vignetteStrength}
           moodValence={smoothedMood}
-          sunMesh={sunMesh}
-          godRaysEnabled={devOverrides.godRaysEnabled}
         />
 
         <OrbitControls

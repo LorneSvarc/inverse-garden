@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { ProceduralSky } from './ProceduralSky';
@@ -32,7 +32,8 @@ const AtmosphericFog: React.FC<{ density?: number; color?: string }> = ({
 }) => {
   const { scene } = useThree();
 
-  useMemo(() => {
+  // useEffect (not useMemo) so the cleanup function actually runs when deps change
+  useEffect(() => {
     scene.fog = new THREE.FogExp2(color, density);
     return () => {
       scene.fog = null;
@@ -52,7 +53,6 @@ interface SpecimenVitrineProps {
   cloudsEnabled?: boolean;
   wallEmissiveEnabled?: boolean;
   wallEmissiveStrength?: number;
-  onSunMeshReady?: (mesh: THREE.Mesh | null) => void;  // Callback to pass sun mesh to parent
 }
 
 export const SpecimenVitrine: React.FC<SpecimenVitrineProps> = ({
@@ -64,16 +64,7 @@ export const SpecimenVitrine: React.FC<SpecimenVitrineProps> = ({
   cloudsEnabled = true,
   wallEmissiveEnabled = true,
   wallEmissiveStrength = 1.0,
-  onSunMeshReady,
 }) => {
-  const sunRef = useRef<THREE.Mesh>(null);
-
-  // Pass the sun mesh reference to parent when it's ready
-  const handleSunRef = useCallback((mesh: THREE.Mesh | null) => {
-    if (onSunMeshReady) {
-      onSunMeshReady(mesh);
-    }
-  }, [onSunMeshReady]);
 
   // Atmosphere clarity: negative mood = clear, positive = overcast
   const atmosphereClarity = (-moodValence + 1) / 2;
@@ -125,13 +116,8 @@ export const SpecimenVitrine: React.FC<SpecimenVitrineProps> = ({
         />
       )}
 
-      {/* Sun mesh - visible for radiant days, source for god rays */}
+      {/* Sun mesh - visible sun orb for radiant days */}
       <SunMesh
-        ref={(mesh) => {
-          // Store locally and pass to parent
-          (sunRef as React.MutableRefObject<THREE.Mesh | null>).current = mesh;
-          handleSunRef(mesh);
-        }}
         hour={hour}
         moodValence={moodValence}
         size={8}

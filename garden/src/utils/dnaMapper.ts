@@ -398,20 +398,37 @@ function buildFallenBloomDNA(entry: MoodEntryWithPercentile): FallenBloomDNA {
  * 2. Builds the appropriate DNA object with colors from emotions/associations
  * 3. Calculates scale from percentile rank (for visual variety)
  *
+ * Results are CACHED by entry ID — DNA for a given entry never changes,
+ * so we build it once and return the same object on subsequent calls.
+ * This prevents creating hundreds of new PlantDNA objects every 50ms
+ * during timeline playback.
+ *
  * Note: Requires entries with scalePercentile pre-calculated.
  * Use parseCSVWithPercentiles() to load data with percentiles.
  */
+const _dnaCache = new Map<string, PlantDNA>();
+
 export function entryToDNA(entry: MoodEntryWithPercentile): PlantDNA {
+  const cached = _dnaCache.get(entry.id);
+  if (cached) return cached;
+
   const plantType = getPlantType(entry.valenceClassification);
+  let result: PlantDNA;
 
   switch (plantType) {
     case 'flower':
-      return { type: 'flower', dna: buildFlowerDNA(entry) };
+      result = { type: 'flower', dna: buildFlowerDNA(entry) };
+      break;
     case 'sprout':
-      return { type: 'sprout', dna: buildSproutDNA(entry) };
+      result = { type: 'sprout', dna: buildSproutDNA(entry) };
+      break;
     case 'decay':
-      return { type: 'decay', dna: buildFallenBloomDNA(entry) };
+      result = { type: 'decay', dna: buildFallenBloomDNA(entry) };
+      break;
   }
+
+  _dnaCache.set(entry.id, result);
+  return result;
 }
 
 /**

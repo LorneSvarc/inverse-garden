@@ -1,10 +1,11 @@
-import React, { useRef, useMemo, forwardRef } from 'react';
+import React, { useRef, useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 
 /**
- * SunMesh v10 - Wet/Dry Garden (Courtyard)
+ * SunMesh v11 - Visible sun orb in the sky
  *
- * Emissive sphere for god rays source. Uses SAME sun arc as TheatricalLighting.
+ * Emissive sphere that follows the sun arc (same as TheatricalLighting).
+ * ForwardRef removed — god rays were removed so nothing needs the mesh ref.
  *
  * Sun path: X-Y plane at FIXED Z=-60 (behind LED wall)
  * - Dawn (6:00): [60, 10, -60]
@@ -13,7 +14,7 @@ import * as THREE from 'three';
  * - Night: hidden
  *
  * Visibility controlled by mood:
- * - Negative mood (radiant/wet): Sun visible for god rays
+ * - Negative mood (radiant/wet): Sun visible
  * - Positive mood (overcast/dry): Sun hidden
  */
 
@@ -64,7 +65,7 @@ function getSunColor(hour: number): THREE.Color {
 function getSunPosition(hour: number, moodValence: number): [number, number, number] {
   const Z_PLANE = -60;
 
-  // Hide when mood >= -0.3 (not sufficiently radiant for god rays)
+  // Hide when mood >= -0.3 (not sufficiently radiant)
   if (moodValence >= -0.3) {
     return [0, -200, Z_PLANE];
   }
@@ -104,45 +105,63 @@ function getSunIntensity(moodValence: number, hour: number): number {
   const baseIntensity = isNight ? 0.2 : 0.6;
 
   // Mood affects intensity: more negative = more radiant
-  // Map from [-0.3 to -1] range to [0 to 1] for modifier
   const radiance = Math.min(1, (-moodValence - 0.3) / 0.7);
-  const moodMultiplier = 0.5 + radiance * 0.5;  // 0.5 to 1.0
+  const moodMultiplier = 0.5 + radiance * 0.5;
 
-  // CAPPED at 1.0 (was reaching 2.0+ before)
+  // CAPPED at 1.0
   return Math.min(1.0, baseIntensity * moodMultiplier);
 }
 
-export const SunMesh = forwardRef<THREE.Mesh, SunMeshProps>(({
+export const SunMesh: React.FC<SunMeshProps> = ({
   hour,
   moodValence,
   size = 8,
   distance = 60,
-}, ref) => {
-  const internalRef = useRef<THREE.Mesh>(null);
-  const meshRef = ref || internalRef;
+}) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const colorRef = useRef(new THREE.Color('#fffaf0'));
 
   const position = useMemo(() => getSunPosition(hour, moodValence), [hour, moodValence]);
-  const color = useMemo(() => getSunColor(hour), [hour]);
   const intensity = useMemo(() => getSunIntensity(moodValence, hour), [moodValence, hour]);
 
+  // Update color via ref mutation instead of creating new THREE.Color objects
+  useEffect(() => {
+    const newColor = getSunColor(hour);
+    colorRef.current.copy(newColor);
+    if (materialRef.current) {
+      materialRef.current.color.copy(colorRef.current);
+      materialRef.current.emissive.copy(colorRef.current);
+    }
+  }, [hour]);
+
+  // Update emissive intensity via ref
+  useEffect(() => {
+    if (materialRef.current) {
+      materialRef.current.emissiveIntensity = Math.min(1.5, intensity * 1.5);
+    }
+  }, [intensity]);
+
   // Sun should be smaller when dim (overcast), larger when radiant
-  const dynamicSize = size * (0.5 + intensity * 0.5);
+  const dynamicScale = 0.5 + intensity * 0.5;
 
   return (
     <mesh
       ref={meshRef}
       position={position}
+      scale={[dynamicScale, dynamicScale, dynamicScale]}
     >
-      <sphereGeometry args={[dynamicSize, 32, 32]} />
+      <sphereGeometry args={[size, 32, 32]} />
       <meshStandardMaterial
-        color={color}
-        emissive={color}
-        emissiveIntensity={Math.min(1.5, intensity * 1.5)} // CAPPED at 1.5 (was 3x)
+        ref={materialRef}
+        color={colorRef.current}
+        emissive={colorRef.current}
+        emissiveIntensity={Math.min(1.5, intensity * 1.5)}
         toneMapped={false}
       />
     </mesh>
   );
-});
+};
 
 SunMesh.displayName = 'SunMesh';
 
