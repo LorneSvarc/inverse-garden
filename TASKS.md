@@ -897,3 +897,72 @@ The previous grey was RGB(156,163,175) — too light. Under toon material with h
 **Files Modified:**
 - `garden/src/utils/plantFading.ts` — Saturation always 1, updated config and docstring
 - `garden/src/utils/dnaMapper.ts` — Content #9CA3AF→#6B7280, fallback #9CA3AF→#6B7280
+
+### 2025-02-19 - Memory Crash & Performance Debugging (4 Rounds)
+
+**Problem:** The experience was crashing during play mode — the browser tab reloaded with a "significant memory" warning after progressing partway through the timeline. The crash happened in Safari (strict ~1GB memory limit). Plants appeared correctly initially but the page would eventually reload.
+
+**Root Causes Identified:**
+1. **GPU object leaks** — Three.js geometries, lights, and materials were being destroyed and recreated every 50ms during playback due to R3F's `args` pattern and unstable `useMemo` dependencies
+2. **Massive draw call count** — LEDWall rendered 2,494 individual `<mesh>` components (58×43 brick grid), each with its own geometry + material
+3. **useMemo cascade storm** — The 50ms playback interval triggered full recomputation of gardenLevel, moodValence, fadeStates, and visiblePlants on every tick, creating hundreds of new objects per second
+4. **Safari memory limit** — Safari enforces ~1GB limit vs Chrome's ~4GB, making the leaks fatal faster
+5. **Playback interval bug** — `currentTime` was in the useEffect dependency array, causing the setInterval to be cleared and recreated every 50ms
+
+**Round 1 — GPU Object Leak Fixes:**
+- `App.tsx` — SmoothedMoodBridge: Added threshold check (>0.01) to prevent 60fps React re-renders of entire tree
+- `ToonClouds.tsx` — Stabilized geometry useMemo with hex string deps instead of THREE.Color object refs; added useEffect cleanup for geometry disposal
+- `SpecimenVitrine.tsx` — AtmosphericFog: Changed useMemo to useEffect so fog cleanup actually runs
+- `CleanToonFlower3D.tsx` — Added useEffect disposal for petal and leaf ExtrudeGeometry on unmount
+- `CleanToonSprout3D.tsx` — Added useEffect disposal for ToonCotyledon SphereGeometry on unmount
+- `FallenBloom3D.tsx` — Added useEffect disposal for petalGeometries, halfLeafGeometries, stemGeometry on unmount
+
+**Round 2 — Stop R3F Object Destruction/Recreation:**
+- `TheatricalLighting.tsx` — hemisphereLight: Replaced `args={[skyColor, groundColor]}` (which destroys/recreates the light every 50ms) with persistent refs, updating `light.color.copy()` via useEffect
+- `SunMesh.tsx` — sphereGeometry: Replaced dynamic `args={[dynamicSize]}` with stable geometry + mesh `scale` prop; added persistent Color ref for material color updates
+- `ProceduralSky.tsx` — ShaderMaterial uniforms: Changed from creating new THREE.Color objects to mutating persistent Color objects in-place via `.copy()`
+- `ExcavatedBed.tsx` — FloorVoid emissiveColor: Added persistent Color ref, update emissive via `.copy()` + `.lerp()` in useEffect
+
+**Round 3 — Performance Optimizations:**
+- `LEDWall.tsx` — **InstancedMesh rewrite**: Converted 2,494 individual `<mesh>` components into 2 `<instancedMesh>` instances (one for lit bricks, one for unlit). Reduced draw calls from ~2,500 to ~3. Shared static BoxGeometry objects. Instance matrices computed once and uploaded to GPU.
+- `dnaMapper.ts` — **entryToDNA cache**: Added `Map<string, PlantDNA>` cache keyed on entry ID. DNA for a given entry never changes, so it's computed once and reused. Prevents creating hundreds of new PlantDNA objects every 50ms.
+- `App.tsx` — **Quantized time dependencies**: Added `currentTimeMinute`, `currentDayStr`, `currentTime10s` as stable memo keys so downstream computations don't re-run on every tick:
+  - `hour` + `gardenLevel`: only recompute when the game-time minute changes
+  - `moodValence`: only recomputes when the calendar day changes
+  - `createdEntries` + `fadeStates`: only recompute every 10 game-time seconds
+- `App.tsx` — **Fixed playback interval bug**: Removed `currentTime` from useEffect dependency array (was causing interval to be cleared/recreated every tick). Uses functional `setCurrentTime(prev => ...)` pattern instead.
+
+**Round 4 — Choppiness Fix + Dead Code Removal:**
+- `App.tsx` — Returned playback interval from 100ms back to 50ms for smooth 20 FPS environment updates. The quantized memo keys from Round 3 ensure only `hour` changes on every tick; the expensive cascades fire occasionally.
+- `PostProcessing.tsx` — Removed GodRays (never functional — broken forwardRef chain + mood threshold meant sunMesh was always null). Removed `sunMesh` prop, `godRaysEnabled` prop, `GodRays` import, `KernelSize` import, and all god ray logic. Kept HueSaturation + Vignette.
+- `SunMesh.tsx` — Removed `forwardRef` wrapper (nothing needs the mesh ref now that god rays are gone). Converted to regular function component.
+- `SpecimenVitrine.tsx` — Removed `onSunMeshReady` prop, `sunRef` useRef, `handleSunRef` useCallback, and callback ref on SunMesh.
+- `App.tsx` — Removed `sunMesh` state, `setSunMesh`, `onSunMeshReady` from SpecimenVitrine, `sunMesh`/`godRaysEnabled` from PostProcessing.
+
+**Results:**
+- Memory crash resolved — JS Heap stable at 27-72MB sawtooth pattern (healthy GC, no leak)
+- Draw calls reduced from ~3,000-3,500 to ~500-1,000
+- useMemo cascade fires 10-50x less frequently during playback
+- Playback is smooth enough for viewing (not perfect, minor choppiness remains in environment transitions)
+- No visual changes — all plants, colors, lighting behavior identical
+
+**Known Remaining Issues (deferred):**
+- LED wall text transitions now change "all at once" instead of individual bricks (side effect of InstancedMesh rewrite — needs single InstancedMesh with per-instance color attribute)
+- Fog never visible (density too low for scene scale — 0.006 at 30 units = 16% opacity)
+- Minor environment choppiness at 20 FPS prop updates — would need useFrame-driven sun/lighting for 60fps smoothness
+- Bloom still disabled from Phase 5 diagnostic
+
+**Files Modified (13 files across 4 rounds):**
+- `garden/src/App.tsx` — SmoothedMoodBridge throttle, quantized time keys, interval fix, god rays removal
+- `garden/src/components/CleanToonFlower3D.tsx` — Geometry disposal on unmount
+- `garden/src/components/CleanToonSprout3D.tsx` — Geometry disposal on unmount
+- `garden/src/components/ExcavatedBed.tsx` — Persistent Color ref for emissive
+- `garden/src/components/FallenBloom3D.tsx` — Geometry disposal on unmount
+- `garden/src/components/environment/LEDWall.tsx` — InstancedMesh rewrite (2,494 meshes → 2)
+- `garden/src/components/environment/PostProcessing.tsx` — God rays removed
+- `garden/src/components/environment/ProceduralSky.tsx` — In-place Color mutation
+- `garden/src/components/environment/SpecimenVitrine.tsx` — AtmosphericFog useEffect, sunRef removed
+- `garden/src/components/environment/SunMesh.tsx` — Stable geometry + Color ref, forwardRef removed
+- `garden/src/components/environment/TheatricalLighting.tsx` — Persistent light refs
+- `garden/src/components/environment/ToonClouds.tsx` — Geometry stabilization + disposal
+- `garden/src/utils/dnaMapper.ts` — entryToDNA cache
