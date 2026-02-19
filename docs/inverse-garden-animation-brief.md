@@ -2,9 +2,10 @@
 
 ## Document Information
 
-**Version:** 1.0  
-**Status:** Ready for Implementation  
-**Created:** February 2025  
+**Version:** 1.1
+**Status:** In Progress — Animation implemented in test scene (`?test=environment`), not yet in main scene
+**Created:** February 2025
+**Updated:** February 2026
 **Purpose:** Define plant growth and fade animations for timeline scrubbing
 
 ---
@@ -29,22 +30,24 @@ Phase 1: STEM EMERGENCE
 ├── Stem geometry starts below ground plane
 ├── Rises upward, breaching the surface
 ├── No bloom/head visible during this phase
-└── Duration: ~60% of total time
+└── Active: 0–50% of total time
 
-Phase 2: LEAF UNFURL  
+Phase 2: LEAF UNFURL
 ├── Leaves appear one at a time
 ├── Each leaf unfurls (or scales in if unfurl is too complex)
 ├── Staggered timing between leaves
-└── Duration: ~20% of total time
+└── Active: 25–70% of total time (overlaps with stem tail and bloom start)
 
 Phase 3: BLOOM REVEAL
 ├── Flower head/center appears
 ├── Petals emerge (ideally one at a time, or as a group if needed)
 ├── Slight settle/overshoot at the end
-└── Duration: ~20% of total time
+└── Active: 60–100% of total time
 ```
 
-**Total Duration:** ~1.5 seconds (tunable parameter)
+> **Note:** Phases overlap — this is the implemented behavior in the test scene. The original brief described sequential phases (60/20/20%); the overlapping approach was chosen during implementation and feels better.
+
+**Total Duration:** ~0.74 seconds at the chosen speed (2.7x multiplier applied to a 2.0s base)
 
 ### The Feel
 
@@ -67,63 +70,86 @@ Phase 3: BLOOM REVEAL
 
 ## Sprout Animation
 
-Same philosophy, adapted for the simpler form:
+**Status:** Needs implementation and testing — phases not yet animated per-section (currently plays as a single unit, if at all).
+
+Same philosophy as the flower, adapted for the simpler form. The phase breakdown and overlapping approach from the flower should be applied here, then tuned:
 
 ```
 Phase 1: STEM EMERGENCE
 ├── Thin stem rises from below ground
-└── Duration: ~50% of total time
+└── Active: ~0–50% of total time
 
 Phase 2: COTYLEDON SPREAD
 ├── Cotyledons (seed leaves) spread open
 ├── Start folded against stem, open outward
-└── Duration: ~30% of total time
+└── Active: ~30–70% of total time (overlapping)
 
 Phase 3: BUD REVEAL
 ├── Bud emerges at top
 ├── Small scale-in or "pop" into place
-└── Duration: ~20% of total time
+└── Active: ~65–100% of total time
 ```
 
-**Total Duration:** ~1.2 seconds (slightly faster than flower — it's simpler)
+**Total Duration:** ~0.59 seconds at 2.7x (proportionally shorter than flower; ratio maintained from original design)
+
+**TODO:**
+- [ ] Implement per-phase animation (stem → cotyledons → bud) matching the flower's overlapping approach
+- [ ] Test in the `?test=environment` scene with the animation test panel
+- [ ] Confirm 2.7x speed feels right for the sprout's simpler form (may want slight adjustment)
 
 ---
 
-## Decay Animation
+## FallenBloom3D Animation (formerly Decay)
 
-**Status:** Tabled — asset not yet finalized.
+**Status:** Needs decision, creation, and testing — asset exists (`FallenBloom3D`) but animation is not yet defined or implemented.
 
-When the fallen petal/debris decay asset is built, animation options to consider:
-- Pieces fall from above and scatter
-- Cracks spread outward from center
-- Fade/materialize in place
+The `FallenBloom3D` component represents the decayed/fallen state of a flower. Its appearance animation needs to be designed from scratch.
+
+### Options to Decide Between
+
+- **A — Fall from above:** Petals/pieces drop from above and land in final position (dramatic, reads clearly)
+- **B — Materialize in place:** Fade/scale in from nothing (simple, consistent with "timeline reveals")
+- **C — Wilt and collapse:** Plant droops, then the fallen version appears as the grown plant fades out (more narrative, more complex)
+
+### TODO
+- [ ] Decide on the animation approach (A, B, or C above)
+- [ ] Implement the chosen animation in the test scene
+- [ ] Test and tune timing — should it feel abrupt or gradual?
+- [ ] Confirm whether FallenBloom3D plays a growth-style entrance, or simply appears when its timestamp is crossed
+- [ ] Add to the confirmed parameters table once timing is locked
 
 ---
 
 ## Fade-Out Animation (Phase 2)
 
-When plants age out of visibility due to timeline position and garden level:
+**Status:** Partially implemented — opacity fade is working. Sinking not yet implemented. Desaturation removed from design.
+
+When plants age out of visibility due to garden level:
 
 ### The Sequence
 
 ```
 FADE OUT
-├── Opacity reduces (toward transparent)
-├── Saturation reduces (toward grey)
-├── Plant slowly sinks into the ground
-└── Duration: ~2-3 seconds (slower than growth)
+├── Opacity reduces progressively (toward transparent)
+└── Plant slowly sinks into the ground [NOT YET IMPLEMENTED]
 ```
+
+### Key Design Note
+
+This is **not a triggered animation** — it's a continuous state driven by garden level. As the garden level changes, plant opacity is calculated directly from that value. There is no fixed duration; the fade is as slow or fast as the user moves through levels.
 
 ### Implementation Notes
 
-- **Sinking:** The entire plant (stem, leaves, bloom) translates downward on Y-axis
-- **Opacity + Y-position** should animate together
-- **Saturation** can be a shader/material property shift
-- **Easing:** `easeInQuad` or linear — gentle, inevitable disappearance
+- **Opacity:** Already connected to garden level — works
+- **Desaturation:** Removed from design — opacity alone is sufficient
+- **Sinking:** The entire plant (stem, leaves, bloom) translates downward on Y-axis — still to be implemented, also driven by garden level (not a timed animation)
+- **Easing:** `easeInQuad` or linear applied to the garden level → opacity/Y mapping
 
 ---
 
 ## Timeline Scrubbing Behavior
+
+> **Note:** This section describes the intended approach, not confirmed behavior. The trigger logic and scrub speed detection are starting points — they haven't been implemented or tested yet and may need significant revision once we get there.
 
 ### Trigger Logic
 
@@ -178,7 +204,7 @@ Animate properties frame-by-frame based on timeline position:
 ```typescript
 function updatePlantAnimation(plant: Plant, timelinePosition: number) {
   const timeSinceBirth = timelinePosition - plant.timestamp;
-  const animationDuration = 1.5; // seconds (converted to timeline units)
+  const animationDuration = 2.0 / 2.7; // ~0.74s — base 2.0s at speed 1.0x, running at 2.7x
   
   if (timeSinceBirth < 0) {
     // Not born yet
@@ -188,16 +214,16 @@ function updatePlantAnimation(plant: Plant, timelinePosition: number) {
   
   const progress = Math.min(timeSinceBirth / animationDuration, 1.0);
   
-  // Phase 1: Stem (0% - 60%)
-  const stemProgress = Math.min(progress / 0.6, 1.0);
+  // Phase 1: Stem (0% - 50%) — overlapping
+  const stemProgress = Math.min(progress / 0.5, 1.0);
   plant.stemY = easeOutQuart(stemProgress) * plant.finalStemHeight - plant.stemStartDepth;
-  
-  // Phase 2: Leaves (60% - 80%)
-  const leafProgress = Math.max(0, Math.min((progress - 0.6) / 0.2, 1.0));
+
+  // Phase 2: Leaves (25% - 70%) — overlapping
+  const leafProgress = Math.max(0, Math.min((progress - 0.25) / 0.45, 1.0));
   plant.leafScale = easeOutBack(leafProgress);
-  
-  // Phase 3: Bloom (80% - 100%)
-  const bloomProgress = Math.max(0, Math.min((progress - 0.8) / 0.2, 1.0));
+
+  // Phase 3: Bloom (60% - 100%) — overlapping
+  const bloomProgress = Math.max(0, Math.min((progress - 0.6) / 0.4, 1.0));
   plant.bloomScale = easeOutElastic(bloomProgress, 0.3); // subtle elastic
   
   plant.visible = true;
@@ -257,17 +283,19 @@ function easeOutElastic(t: number, amplitude = 1, period = 0.3): number {
 
 ---
 
-## Open Parameters (To Tune)
+## Confirmed Parameters
 
-| Parameter | Starting Value | Notes |
-|-----------|----------------|-------|
-| Flower growth duration | 1.5s | Full animation time |
-| Sprout growth duration | 1.2s | Simpler form = faster |
-| Stem phase percentage | 60% | How much of duration is stem |
-| Leaf phase percentage | 20% | How much of duration is leaves |
-| Bloom phase percentage | 20% | How much of duration is bloom |
-| Fast scrub threshold | 2.0 days/sec | When to skip animations |
-| Fade-out duration | 2.5s | Slower than growth |
+| Parameter | Value | Notes |
+|-----------|-------|-------|
+| Animation speed multiplier | **2.7x** | Chosen feel — tuned in test scene |
+| Base animation duration (code) | 2.0s | At 1.0x: `progress += deltaTime * speed * 0.5` → 1/0.5 = 2s |
+| Flower growth duration (at 2.7x) | **~0.74s** | 2.0 / 2.7 |
+| Sprout growth duration (at 2.7x) | **~0.59s** | Proportionally shorter (≈80% of flower) |
+| Stem phase | 0–50% | Overlapping phases as implemented |
+| Leaf phase | 25–70% | Overlapping with stem and bloom |
+| Bloom phase | 60–100% | Overlapping with leaves |
+| Fast scrub threshold | 2.0 days/sec | When to skip animations — still needs tuning |
+| Fade-out | garden level → opacity | Not duration-based — progressive, driven by garden level. Sinking not yet implemented |
 | Stem start depth | -2.0 units | How far below ground stem starts |
 | Elastic amplitude | 0.3 | Very subtle spring |
 | Back overshoot | 0.5 | Very subtle overshoot |
@@ -277,21 +305,26 @@ function easeOutElastic(t: number, amplitude = 1, period = 0.3): number {
 ## Visual Reference
 
 ```
-TIME →
+TIME → (at 2.7x speed, total = ~0.74s)
 
-t=0         t=0.3       t=0.6       t=0.9       t=1.0       t=1.5
-(birth)     (30%)       (60%)       (90%)       (100%)      (growth complete)
+t=0         t=0.19      t=0.37      t=0.56      t=0.74
+(birth)     (25%)       (50%)       (75%)       (100% — growth complete)
 
-            ·                        🌸          🌸          🌸
-                        ╷           ╱│╲         ╱│╲         ╱│╲
-                        │          🌿│🌿       🌿│🌿       🌿│🌿
-            ·           │           │           │           │
-═══════════════════════════════════════════════════════════════════
+                                     🌸          🌸
+                        ╷           ╱│╲         ╱│╲
+                        │          🌿│🌿       🌿│🌿
+            ·           │           │           │
+═════════════════════════════════════════════════════
     ↑           ↑           ↑           ↑           ↑
  (below     (stem tip   (stem full, (leaves +   (final
- ground)    emerging)   leaves      bloom)      state)
-                        starting)
+ ground)    emerging)   leaves      bloom       state)
+                        starting)   starting)
 ```
+
+Implemented phase overlap:
+- Stem active: t=0 → t=0.37s (0–50%)
+- Leaves active: t=0.19s → t=0.52s (25–70%)
+- Bloom active: t=0.44s → t=0.74s (60–100%)
 
 ---
 
@@ -313,14 +346,31 @@ t=0         t=0.3       t=0.6       t=0.9       t=1.0       t=1.5
 
 ## Success Criteria
 
-- [ ] Flower stem visibly emerges from below ground, not scaling from a point
-- [ ] Leaves appear after stem, with individual timing
+**Flower (in progress)**
+- [x] Flower animation implemented in test scene (`?test=environment`)
+- [x] Animation speed confirmed at 2.7x (~0.74s total)
+- [x] Overlapping phase approach implemented and feels good
+- [ ] Flower animation ported to main scene
+- [ ] Stem visibly emerges from below ground, not scaling from a point
+- [ ] Leaves appear with individual timing, overlapping stem
 - [ ] Bloom appears last, with satisfying settle
+
+**Sprout (not started)**
+- [ ] Per-phase animation implemented (stem → cotyledons → bud)
+- [ ] Speed tested and confirmed at 2.7x (~0.59s target)
+- [ ] Feels proportionally right alongside the flower
+
+**FallenBloom3D (not started)**
+- [ ] Animation approach decided
+- [ ] Animation implemented and tested in test scene
+- [ ] Feels consistent with the overall "elegant cartoon" tone
+
+**System**
 - [ ] Scrubbing forward at normal speed shows smooth staggered growth
 - [ ] Scrubbing fast skips animations (plants snap to final state)
 - [ ] Scrubbing backward removes plants cleanly (no reverse animation needed)
-- [ ] Overall feel is "elegant cartoon" — stylized but not cheap
+- [ ] All animations ported to main scene
 
 ---
 
-*This brief should be read alongside the main GDD (inverse-garden-gdd-v3.3.md) and the atmosphere spec for full context.*
+*This brief should be read alongside the main GDD (inverse-garden-gdd-v4.0.md) for full context.*

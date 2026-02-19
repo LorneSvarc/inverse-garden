@@ -15,124 +15,64 @@ npm run dev
 
 ### Test Modes
 
-- `http://localhost:5173/` - Main garden with timeline
-- `http://localhost:5173/?test=vitrine` - Environment test scene (recommended for development)
-- `http://localhost:5173/?test=environment` - Legacy environment test
-- `http://localhost:5173/playground` - Atmosphere playground
+- `http://localhost:5173/` — Main garden with full data pipeline and timeline
+- `http://localhost:5173/?dev=true` — Main garden with dev panel (parameter overrides)
+- `http://localhost:5173/?test=vitrine` — Environment test scene with controls
+- `http://localhost:5173/?test=environment` — Legacy environment test (has animation panel)
+- `http://localhost:5173/?test=fallenbloom` — Decay parameter tuning
+- `http://localhost:5173/playground` — Atmosphere playground
+
+## Documentation
+
+| Document | Location | Purpose |
+|----------|----------|---------|
+| **GDD v4.0** | `docs/inverse-garden-gdd-v4.0.md` | Canonical reference — read first |
+| **Final Sprint** | `docs/FINAL-SPRINT.md` | Active tasks — working document |
+| Animation Brief | `docs/inverse-garden-animation-brief.md` | Build spec for growth animations |
+| Moebius Pass Spec | `docs/inverse-garden-moebius-pass-spec.md` | Build spec for post-processing shader |
+| Session History | `TASKS.md` (root) | Archived development log |
 
 ## Architecture
 
-### Environment System (`src/components/environment/`)
+### Data Flow
 
-The "Specimen Vitrine" environment creates a bounded, exhibit-like space:
-
-| Component | Purpose | Responds To |
-|-----------|---------|-------------|
-| `SpecimenVitrine.tsx` | Main orchestrator | - |
-| `ProceduralSky.tsx` | Gradient sky dome | Time only |
-| `TheatricalLighting.tsx` | Sun arc, shadows | Time only |
-| `ToonClouds.tsx` | Ghibli-style gradient clouds | Mood (toggleable) |
-| `LEDWall.tsx` | Valence text display | Mood |
-| `SunMesh.tsx` | Visible sun for god rays | Hour, Mood |
-| `PostProcessing.tsx` | Bloom, god rays, vignette | Mood |
-
-### Ground System (`src/components/ExcavatedBed.tsx`)
-
-Two distinct areas:
-
-1. **Soil (inside bed)** - Static brown with texture, no mood response
-2. **Floor (outside bed)** - Emissive glow that changes with mood:
-   - Negative mood (-1): Sweet yellow-orange glow (`#ff9922`)
-   - Neutral (0): Warm amber (`#996633`)
-   - Positive mood (+1): Musty dark blue (`#334466`)
+```
+CSV → csvParser → percentileCalculator → dnaMapper (cached) → positionCalculator
+                                                                      ↓
+Timeline scrub → currentTime → ┬→ hour         → Sky, Lighting, Shadows
+                               ├→ moodValence  → Clouds, Floor glow, Fog
+                               ├→ gardenLevel  → Plant fading rates
+                               └→ visiblePlants → Render plants with fade state
+```
 
 ### Plant Components
 
-| Component | Valence | Description |
-|-----------|---------|-------------|
-| `CleanToonFlower3D.tsx` | Negative | Beautiful, vibrant flowers |
-| `CleanToonSprout3D.tsx` | Neutral | Growing sprouts |
-| `CleanToonDecay3D.tsx` | Positive | Decay patches |
+| Component | Valence | Material |
+|-----------|---------|----------|
+| `CleanToonFlower3D.tsx` | Negative | meshToonMaterial |
+| `CleanToonSprout3D.tsx` | Neutral | meshToonMaterial |
+| `FallenBloom3D.tsx` | Positive | meshToonMaterial (decay gradient) |
 
-## Controls (Vitrine Test)
+### Environment (`src/components/environment/`)
 
-- **Time of Day**: Hour slider (affects lighting direction and color)
-- **Mood Valence**: -1 to +1 (affects floor glow, clouds, god rays)
-- **Camera Limits**: Min/max distance and polar angle controls
-- **Clouds**: Toggle on/off
-- **Shadows**: Toggle on/off
-- **God Rays**: Toggle on/off
-- **Post-processing**: Bloom, vignette, fog density
+| Component | Responds To |
+|-----------|-------------|
+| `SpecimenVitrine.tsx` | Orchestrator |
+| `ProceduralSky.tsx` | Time |
+| `TheatricalLighting.tsx` | Time |
+| `ToonClouds.tsx` | Mood |
+| `LEDWall.tsx` | Mood + Time |
+| `SunMesh.tsx` | Time + Mood |
+| `PostProcessing.tsx` | — (bloom disabled, vignette active) |
 
-## Design Principles
+### Ground (`ExcavatedBed.tsx`)
 
-1. **Inversion is sacred** - Negative = beautiful, positive = muted
-2. **Time controls lighting** - Sun position, shadow direction, color temperature
-3. **Mood controls atmosphere** - Floor glow, cloud coverage, god ray intensity
-4. **Exhibit aesthetic** - Bounded, intentional space with LED wall anchor
-5. **Toon shading** - Consistent stylized look across all elements
-
-## Data Flow
-
-```
-Timeline scrub → Current entry
-                    ↓
-         ┌─────────┴─────────┐
-         ↓                   ↓
-    Entry timestamp     Daily Mood
-         ↓                   ↓
-    Hour (0-24)        Mood Valence (-1 to +1)
-         ↓                   ↓
-    - Sky colors         - Floor glow color
-    - Sun position       - Cloud coverage
-    - Shadow angle       - God ray intensity
-    - Light temperature  - Bloom/saturation
-```
-
-## File Structure
-
-```
-src/
-├── components/
-│   ├── environment/
-│   │   ├── SpecimenVitrine.tsx    # Main environment
-│   │   ├── ProceduralSky.tsx      # Time-based sky
-│   │   ├── TheatricalLighting.tsx # Time-based lighting
-│   │   ├── ToonClouds.tsx         # Mood-based clouds
-│   │   ├── LEDWall.tsx            # Valence text display
-│   │   ├── SunMesh.tsx            # Visible sun
-│   │   └── PostProcessing.tsx     # Effects
-│   ├── ExcavatedBed.tsx           # Ground system
-│   ├── CleanToonFlower3D.tsx      # Flower component
-│   ├── CleanToonSprout3D.tsx      # Sprout component
-│   ├── CleanToonDecay3D.tsx       # Decay component
-│   └── VitrineTest.tsx            # Test scene
-├── utils/
-│   ├── dnaMapper.ts               # Entry → plant DNA
-│   ├── csvParser.ts               # Mood data parsing
-│   └── toonGradient.ts            # Shared toon materials
-└── config/
-    └── environmentConfig.ts       # Ground bounds, etc.
-```
-
-## Cloud System (ToonClouds.tsx)
-
-Ghibli-style gradient clouds with dynamic mood response:
-
-| Mood State | Color | Opacity | Scale |
-|------------|-------|---------|-------|
-| Neutral (0) | White/bright | 40% (wispy) | 0.7x (small) |
-| Positive (+1) | Gray/heavy | 100% (dense) | 1.2x (large) |
-
-Features:
-- Top-to-bottom gradient shading (lit tops, shadowed undersides)
-- Time-of-day color variation (dawn, day, dusk, night)
-- Coverage increases with positive mood
-- Slow drift animation
+- **Inside bed**: Static brown soil with texture
+- **Outside bed**: Emissive glow responding to mood
 
 ## Tech Stack
 
-- React + TypeScript
+- React 19 + TypeScript
 - Three.js via React Three Fiber
 - @react-three/drei for helpers
 - @react-three/postprocessing for effects

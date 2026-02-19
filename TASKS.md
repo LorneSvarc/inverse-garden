@@ -1,9 +1,34 @@
-# Inverse Garden: Task Tracker
+# Inverse Garden: Session History (Archived)
 
-**Canonical Spec:** `inverse-garden-gdd-v3.3.md` (always defer to GDD for details)
+> **This file is archived.** It contains the full development session log from Phase 1 through the Feb 19, 2026 performance optimization. All current specs are now in `docs/inverse-garden-gdd-v4.0.md`. Active tasks are in `docs/FINAL-SPRINT.md`.
+
 **GitHub Repo:** https://github.com/LorneSvarc/inverse-garden
 
 ---
+
+## Quick Reference: What Was Completed
+
+| Phase | Completed | Summary |
+|-------|-----------|---------|
+| Phase 1 | Jan 19, 2025 | Data pipeline, CSV parsing, DNA mapping, basic spawning |
+| Phase 1.5 | Jan 19, 2025 | Percentile-based scale calibration |
+| Phase 2A | Jan 21, 2025 | Timeline UI, plant visibility based on time |
+| Phase 2.5 | Jan 21, 2025 | Spatial layout (spiral + scatter positioning) |
+| Phase 2B | Jan 23, 2025 | Garden level system, plant fading |
+| Phase 4A | Jan 23, 2025 | Atmosphere playground |
+| Rendering Styles | Jan 26, 2025 | Clean Toon chosen as rendering style |
+| ToonClouds | Feb 9, 2025 | Ghibli-style gradient clouds |
+| Scene Assembly | Feb 9, 2025 | Unified main scene with SpecimenVitrine |
+| Phase 4C | Feb 16, 2025 | FallenBloom decay redesign |
+| Phase 5 | Feb 16, 2025 | Daily Mood filtering, color fixes, click-to-identify |
+| Phase 5A | Feb 16, 2025 | Opacity-only fading, Content grey fix |
+| Performance | Feb 19, 2026 | Memory crash fix, InstancedMesh, caching, god rays removal |
+
+---
+
+## Full Session Log (Historical Detail)
+
+The session-by-session detail follows. This is preserved for "why did we do X?" questions.
 
 ## Phase 1: Data Pipeline & Basic Spawning ✅ COMPLETE
 
