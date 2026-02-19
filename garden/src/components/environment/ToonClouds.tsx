@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
@@ -288,10 +288,31 @@ const GhibliCloud: React.FC<{
 }> = ({ position, scale, rotationY, topColor, bottomColor, opacity, driftOffset }) => {
   const meshRef = useRef<THREE.Mesh>(null);
 
-  // Create gradient geometry
+  // Stabilize color dependencies using hex strings instead of object references
+  // This prevents geometry recreation when the same color is passed as a new THREE.Color instance
+  const topColorHex = topColor.getHexString();
+  const bottomColorHex = bottomColor.getHexString();
+
+  // Create gradient geometry — only recreates when color or scale actually changes
   const { geometry } = useMemo(() => {
-    return createGradientCloudGeometry(scale, topColor, bottomColor);
-  }, [scale, topColor, bottomColor]);
+    return createGradientCloudGeometry(scale, new THREE.Color(`#${topColorHex}`), new THREE.Color(`#${bottomColorHex}`));
+  }, [scale, topColorHex, bottomColorHex]);
+
+  // Dispose old geometry when it changes or component unmounts
+  const geometryRef = useRef<THREE.BufferGeometry | null>(null);
+  useEffect(() => {
+    // Dispose previous geometry if it exists and is different
+    if (geometryRef.current && geometryRef.current !== geometry) {
+      geometryRef.current.dispose();
+    }
+    geometryRef.current = geometry;
+    return () => {
+      if (geometryRef.current) {
+        geometryRef.current.dispose();
+        geometryRef.current = null;
+      }
+    };
+  }, [geometry]);
 
   // Slow drift animation
   useFrame((state) => {

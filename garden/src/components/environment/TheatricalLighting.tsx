@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
 
 /**
@@ -165,17 +165,25 @@ export const TheatricalLighting: React.FC<TheatricalLightingProps> = ({
     return 1.0;  // Day: full
   }, [hour]);
 
-  // Warmer ground bounce color
-  const groundColor = useMemo(() => {
+  // Persistent Color refs to avoid creating new THREE.Color objects every update
+  const hemiRef = useRef<THREE.HemisphereLight>(null);
+  const groundColorRef = useRef(new THREE.Color('#4a3525'));
+  const skyColorRef = useRef(new THREE.Color('#3a3a50'));
+
+  // Update hemisphere light colors via ref (avoids destroying/recreating the light)
+  useEffect(() => {
     const baseGround = new THREE.Color('#4a3525');
     const warmGround = new THREE.Color('#5a4030');
-    return baseGround.lerp(warmGround, lighting.warmth);
-  }, [lighting.warmth]);
+    groundColorRef.current.copy(baseGround).lerp(warmGround, lighting.warmth);
 
-  const skyColor = useMemo(() => {
     const coolSky = new THREE.Color('#3a3a50');
     const warmSky = new THREE.Color('#4a4540');
-    return coolSky.lerp(warmSky, lighting.warmth);
+    skyColorRef.current.copy(coolSky).lerp(warmSky, lighting.warmth);
+
+    if (hemiRef.current) {
+      hemiRef.current.color.copy(skyColorRef.current);
+      hemiRef.current.groundColor.copy(groundColorRef.current);
+    }
   }, [lighting.warmth]);
 
   useEffect(() => {
@@ -206,9 +214,10 @@ export const TheatricalLighting: React.FC<TheatricalLightingProps> = ({
         shadow-camera-bottom={-40}
       />
 
-      {/* Hemisphere light - subtle ambient with ground bounce */}
+      {/* Hemisphere light - stable instance, colors updated via ref */}
       <hemisphereLight
-        args={[skyColor, groundColor, 0.4]}
+        ref={hemiRef}
+        args={['#3a3a50', '#4a3525', 0.4]}
       />
 
       {/* MINIMAL ambient - just enough to keep shadows from going pure black */}

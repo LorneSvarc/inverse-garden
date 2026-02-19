@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { FlowerDNA } from '../types';
@@ -43,6 +43,11 @@ const ToonPetal: React.FC<{
     });
   }, [dna.petalWidth, dna.petalLength]);
 
+  // Dispose geometry on unmount or when deps change
+  useEffect(() => {
+    return () => { petalShape.dispose(); };
+  }, [petalShape]);
+
   const adjustedColor = useMemo(() => adjustColorSaturation(color, saturation), [color, saturation]);
 
   // Subtle petal animation
@@ -86,6 +91,11 @@ const ToonStemLeaf: React.FC<{
     s.bezierCurveTo(-0.2, 0.8, -0.2, 0.2, 0, 0);
     return new THREE.ExtrudeGeometry(s, { depth: 0.05, bevelEnabled: false });
   }, []);
+
+  // Dispose geometry on unmount
+  useEffect(() => {
+    return () => { shape.dispose(); };
+  }, [shape]);
 
   const adjustedColor = useMemo(() => adjustColorSaturation(color, saturation), [color, saturation]);
 

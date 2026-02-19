@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { SproutDNA } from '../types';
@@ -33,6 +33,11 @@ const ToonCotyledon: React.FC<{
   const shape = useMemo(() => {
     return new THREE.SphereGeometry(0.077, 24, 16);
   }, []);
+
+  // Dispose geometry on unmount
+  useEffect(() => {
+    return () => { shape.dispose(); };
+  }, [shape]);
 
   const adjustedColor = useMemo(() => adjustColorSaturation(color, saturation), [color, saturation]);
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 
 /**
@@ -176,17 +176,12 @@ export const ProceduralSky: React.FC<ProceduralSkyProps> = ({
   hour,
   moodValence: _moodValence,  // Kept for interface compatibility but not used
 }) => {
-  // Calculate colors based on time ONLY (no mood adjustment)
-  const { zenith, horizon } = useMemo(() => {
-    return getTimeColors(hour);
-  }, [hour]);
-
-  // Create shader material
+  // Create shader material once with persistent Color objects in uniforms
   const material = useMemo(() => {
     return new THREE.ShaderMaterial({
       uniforms: {
-        zenithColor: { value: zenith },
-        horizonColor: { value: horizon },
+        zenithColor: { value: new THREE.Color() },
+        horizonColor: { value: new THREE.Color() },
       },
       vertexShader: skyVertexShader,
       fragmentShader: skyFragmentShader,
@@ -195,11 +190,12 @@ export const ProceduralSky: React.FC<ProceduralSkyProps> = ({
     });
   }, []);
 
-  // Update uniforms when colors change
+  // Update uniform colors in-place via .copy() — avoids creating new Color objects
   useEffect(() => {
-    material.uniforms.zenithColor.value = zenith;
-    material.uniforms.horizonColor.value = horizon;
-  }, [zenith, horizon, material]);
+    const { zenith, horizon } = getTimeColors(hour);
+    material.uniforms.zenithColor.value.copy(zenith);
+    material.uniforms.horizonColor.value.copy(horizon);
+  }, [hour, material]);
 
   return (
     <mesh material={material}>

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 import { getDecayToonGradient } from '../utils/toonGradient';
 import { adjustColorSaturation } from '../utils/plantFading';
@@ -243,6 +243,11 @@ const FallenBloom3D: React.FC<FallenBloom3DProps> = ({
     });
   }, [petalWidth, petalLength, petalCount, effectiveFray, frayDensity, effectiveCurl, decayAmount, seed]);
 
+  // Dispose petal geometries on unmount or when deps change
+  useEffect(() => {
+    return () => { petalGeometries.forEach(g => g.dispose()); };
+  }, [petalGeometries]);
+
   // ── Half-leaf geometries (one per leaf for unique fraying) ──
   // Living flower leaf is 0→1 height, ±0.2 width. This half-leaf is ~0.2 height
   // with one straight edge (midrib cut) and one curved edge. Much smaller than petals.
@@ -351,6 +356,11 @@ const FallenBloom3D: React.FC<FallenBloom3DProps> = ({
     });
   }, [leafCount, effectiveFray, frayDensity, seed]);
 
+  // Dispose leaf geometries on unmount or when deps change
+  useEffect(() => {
+    return () => { halfLeafGeometries.forEach(g => g.dispose()); };
+  }, [halfLeafGeometries]);
+
   // ── Stem geometry: half-cylinder lying flat on ground ──
   // Semicircle cross-section (flat side down) extruded along a curved path
   const stemRandom = useMemo(() => createSeededRandom(seed + 100), [seed]);
@@ -381,6 +391,11 @@ const FallenBloom3D: React.FC<FallenBloom3DProps> = ({
       extrudePath,
     });
   }, [stemLength, stemCurvature]);
+
+  // Dispose stem geometry on unmount or when deps change
+  useEffect(() => {
+    return () => { stemGeometry.dispose(); };
+  }, [stemGeometry]);
 
   // ── Layout computation ──
   const layout = useMemo(() => {

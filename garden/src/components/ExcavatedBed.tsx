@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { GROUND_BOUNDS } from '../config/environmentConfig';
 import { getToonGradient } from '../utils/toonGradient';
@@ -94,37 +94,37 @@ function smoothNoise(x: number, y: number, seed: number): number {
  */
 const FloorVoid: React.FC<{ moodValence: number }> = ({ moodValence }) => {
   const gradientMap = useMemo(() => getToonGradient(), []);
+  const materialRef = useRef<THREE.MeshToonMaterial>(null);
 
   // Base color - dark so emissive glow is the main color
   const floorColor = useMemo(() => {
     return new THREE.Color('#222018');
   }, []);
 
-  // Emissive color IS the visible floor color - strong saturation
-  const emissiveColor = useMemo(() => {
-    if (moodValence < 0) {
-      // Negative: sweet yellow-orange glow
-      const t = Math.abs(moodValence);
-      const neutral = new THREE.Color('#996633');  // Warm amber
-      const warm = new THREE.Color('#ff9922');     // Sweet yellow-orange
-      return neutral.clone().lerp(warm, t);
-    } else {
-      // Positive: musty dark blue
-      const t = moodValence;
-      const neutral = new THREE.Color('#996633');  // Warm amber
-      const cool = new THREE.Color('#334466');     // Musty dark blue
-      return neutral.clone().lerp(cool, t);
-    }
-  }, [moodValence]);
+  // Persistent Color ref for emissive — mutated in-place to avoid creating new objects
+  const emissiveColorRef = useRef(new THREE.Color('#996633'));
 
-  // Emissive intensity - this IS the floor visibility
+  // Emissive intensity
   const emissiveIntensity = useMemo(() => {
-    // Constant intensity so floor is always visible
-    // Slightly brighter for negative (warm glow)
     if (moodValence < 0) {
       return 0.5 + Math.abs(moodValence) * 0.2;
     } else {
       return 0.5;
+    }
+  }, [moodValence]);
+
+  // Update emissive color via ref mutation instead of creating new THREE.Color objects
+  useEffect(() => {
+    const neutral = new THREE.Color('#996633');
+    if (moodValence < 0) {
+      const warm = new THREE.Color('#ff9922');
+      emissiveColorRef.current.copy(neutral).lerp(warm, Math.abs(moodValence));
+    } else {
+      const cool = new THREE.Color('#334466');
+      emissiveColorRef.current.copy(neutral).lerp(cool, moodValence);
+    }
+    if (materialRef.current) {
+      materialRef.current.emissive.copy(emissiveColorRef.current);
     }
   }, [moodValence]);
 
@@ -160,8 +160,9 @@ const FloorVoid: React.FC<{ moodValence: number }> = ({ moodValence }) => {
   return (
     <mesh geometry={geometry} position={[0, -0.01, 0]} receiveShadow>
       <meshToonMaterial
+        ref={materialRef}
         color={floorColor}
-        emissive={emissiveColor}
+        emissive={emissiveColorRef.current}
         emissiveIntensity={emissiveIntensity}
         gradientMap={gradientMap}
         toneMapped={false}
