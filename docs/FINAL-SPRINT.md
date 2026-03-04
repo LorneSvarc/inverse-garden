@@ -21,46 +21,43 @@
 
 ## Task Sequence
 
-### 1. Shader Decision Point ⬜ NOT STARTED
+### 1. Shader Decision Point — DEFERRED
 
 **What:** Implement the Moebius-style post-processing pass and evaluate whether it becomes the visual foundation.
 
 **Build spec:** `docs/inverse-garden-moebius-pass-spec.md` (follow steps 0–5)
 
 **Steps:**
-- [ ] Step 0: Swap toon materials → standard PBR (preserve all color values)
-- [ ] Step 1: Scaffold custom pass, get red-tint test working
-- [ ] Step 2: Edge detection / outlines with hand-drawn wobble
-- [ ] Step 3: Crosshatched shadows
-- [ ] Step 5: Wire up tunable uniforms (outline thickness, depth multiplier, etc.)
-- [ ] Screenshot comparison: toggle on/off against current toon look
-- [ ] **CHECK WITH LORNE:** Show comparison. Go/no-go is a gut-feel visual evaluation.
+- [x] Step 0: Swap toon materials → standard PBR (preserve all color values)
+- [x] Step 1: Scaffold custom pass, get red-tint test working
+- [x] Step 2: Edge detection / outlines with hand-drawn wobble
+- [x] Step 3: Crosshatched shadows
+- [x] Step 5: Wire up tunable uniforms (outline thickness, depth multiplier, etc.)
+- [x] Screenshot comparison: toggle on/off against current toon look
+- [x] **CHECK WITH LORNE:** Show comparison. Go/no-go is a gut-feel visual evaluation.
 
-**Decision outcomes:**
-- **Keep:** All subsequent work builds on PBR + post-process. Adapt the pass for Inverse Garden.
-- **Keep partial:** Keep outlines, drop crosshatching, layer own treatment on top.
-- **Revert:** Go back to toon materials, move to Task 2.
+**Decision: DEFERRED** — Moebius outlines looked promising but the three-stdlib EffectComposer pipeline introduced an unresolvable brightness mismatch (scene significantly darker with pass enabled). After multiple fix attempts (NoToneMapping, manual ACES + sRGB in shader, exposure compensation), brightness still didn't match. All changes reverted — materials back to meshToonMaterial, postprocessing files deleted, App.tsx restored to pre-Moebius state. See Decisions log below.
 
-**Hard exit:** If the pipeline isn't working or the visual result is clearly wrong, stop and move on.
-
-**Performance check:** The shader renders the scene 3x per frame. Must not re-introduce the memory crashes fixed in the stability phase. Test on Safari.
-
-**Done when:** Lorne has made the keep/partial/revert decision and it's logged below in Decisions.
+**Reverted to:** Commit `80be93e` (pre-Moebius state). No files changed.
 
 ---
 
-### 2. Scale Calibration ⬜ NOT STARTED
+### 2. Scale Calibration 🔶 IN PROGRESS — REVISIT LATER
 
 **What:** Fix flower scale distribution so valence intensity reads clearly. Scale IS the primary valence signal — if it doesn't communicate, the encoding is weak.
 
 **Problem:** Low-percentile flowers (0–10%) all look similar in size. The linear percentile→scale mapping doesn't create enough distinction at the small end.
 
 **Steps:**
-- [ ] Try non-linear curve: `percentile^0.8` compression (or similar) to spread out the low end
+- [x] Try non-linear curve: applied `percentile^0.7` power curve to spread out the low end
 - [ ] Try tighter range: e.g., 0.6–1.3 instead of 0.4–1.8
 - [ ] Test with full dataset — compare visual size distribution before/after
 - [ ] Also evaluate FallenBloom scale range (1.0–3.6) — is this too wide?
 - [ ] **CHECK WITH LORNE:** Show before/after of garden at various timeline points
+
+**Change made (2026-03-02):** Replaced linear `percentileToScale()` with `Math.pow(t, 0.7)` power curve in `percentileCalculator.ts`. Endpoints unchanged (flower 0.4–1.8, sprout 0.8–1.0, decay 1.0–3.6), but low-end plants are more spread out. Lorne's initial assessment: "seems ok" — needs re-evaluation after Tasks 3/4 when scene composition and plant variance may change how scale reads.
+
+**⚠️ REVISIT:** Re-evaluate scale curve, min/max ranges, and FallenBloom range after scene redesign (Task 4) and plant variance (Task 3) are in place. Those changes may affect how scale reads visually.
 
 **Done when:** Clear visual size distinction across the percentile range. Lorne confirms it reads well.
 
@@ -174,7 +171,7 @@
 **Steps:**
 
 **Flower (port existing):**
-- [ ] If shader kept: update AnimatedToonFlower3D to use meshStandardMaterial
+- [ ] Update AnimatedToonFlower3D to use meshStandardMaterial (shader decision: keep partial → PBR materials)
 - [ ] Integrate into main App.tsx (replace static CleanToonFlower3D for newly-appearing plants)
 - [ ] Verify timeline interaction: scrub speed detection, fast-scrub snap to final state
 - [ ] Confirm animation speed at 2.7x (~0.74s total) still feels right in context
@@ -239,7 +236,8 @@
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| | | |
+| 2026-02-19 | **Shader: DEFERRED** — Moebius post-processing pass fully reverted. All code removed, materials back to meshToonMaterial. | Outlines themselves looked good (hand-drawn illustration feel, plant silhouettes pop). But the three-stdlib EffectComposer pipeline couldn't achieve brightness parity with the normal render path. Root cause: EffectComposer's intermediate render targets + double tone mapping/sRGB encoding. Multiple fix attempts failed (manual ACES in shader, sRGB compensation, exposure bumps 0.9→1.3). Sky and highlights remained visibly darker. PBR material swap was also reverted since it was never validated independently. Could revisit with @react-three/postprocessing Effect class or different approach in Polish Sprint. |
+| 2026-03-02 | **Scale: Power curve applied, revisit later** — `percentileToScale()` changed from linear to `t^0.7`. Initial look OK but needs re-evaluation after Tasks 3/4. | Linear mapping made low-percentile plants indistinguishable. Power curve spreads low end (percentile 10 flower: 0.54→0.67 scale). Min/max ranges and FallenBloom range (1.0–3.6) still need evaluation with full scene context. |
 
 ---
 

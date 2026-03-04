@@ -132,5 +132,7 @@ export function calculatePercentiles(entries: MoodEntry[]): MoodEntryWithPercent
  * @returns Scale value between min and max
  */
 export function percentileToScale(percentile: number, min: number, max: number): number {
-  return min + (percentile / 100) * (max - min);
+  const t = percentile / 100;
+  const curved = Math.pow(t, 0.7); // Spread out the low end for better visual distinction
+  return min + curved * (max - min);
 }
