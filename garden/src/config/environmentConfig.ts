@@ -23,5 +23,14 @@ export const CAMERA_LIMITS = {
   maxAzimuthAngle: Math.PI / 3,    // was PI/2
 };
 
+// Week-per-row layout configuration (replaces patch-based system)
+export const LAYOUT_CONFIG = {
+  daysPerRow: 7,               // Monday–Sunday
+  rowSpacing: 2.0,             // world units between row centers
+  daySlotWidth: 4.6,           // world units per day slot (34 / 7 ≈ 4.86, with margin)
+  entryClusterRadius: 1.0,     // max spread within a day cluster (tightened for clearer day separation)
+  weekStartDay: 1,             // 1 = Monday (ISO standard)
+};
+
 // Scene background color (will be replaced by skybox)
 export const SCENE_BACKGROUND_COLOR = '#2A3A4A';

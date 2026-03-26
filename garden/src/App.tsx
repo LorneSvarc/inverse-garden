@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import type { MoodEntryWithPercentile, PlantDNA } from './types';
 import { parseCSVWithPercentiles } from './utils/csvParser';
 import { entryToDNA, getPlantType } from './utils/dnaMapper';
-import { calculatePositions, calculatePositionsWithDebug, type PatchDebugInfo } from './utils/positionCalculator';
+import { calculatePositionsWithDebug, type LayoutDebugInfo, type DaySummary, type WeekSummary } from './utils/positionCalculator';
 import { calculateGardenLevel } from './utils/gardenLevel';
 import { calculateFadeState, type FadeState } from './utils/plantFading';
 import { SpecimenVitrine } from './components/environment/SpecimenVitrine';
@@ -328,7 +328,7 @@ function DevPanel({
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', cursor: 'pointer' }}>
               <input type="checkbox" checked={overrides.patchDebugEnabled} onChange={(e) => update({ patchDebugEnabled: e.target.checked })} />
-              <span>Patch Debug</span>
+              <span>Layout Debug</span>
             </label>
           </div>
         </div>
@@ -400,8 +400,12 @@ function App() {
   // Pre-calculated positions for all entries (stable, doesn't change with timeline)
   const [positions, setPositions] = useState<Map<string, [number, number, number]>>(new Map());
 
-  // Patch debug info (populated when using patch-based positioning)
-  const [patchDebugInfo, setPatchDebugInfo] = useState<PatchDebugInfo[]>([]);
+  // Layout debug info (week rows and day slots)
+  const [layoutDebugInfo, setLayoutDebugInfo] = useState<LayoutDebugInfo>({ weekRows: [], daySlots: [] });
+
+  // Pre-calculated summaries for Phase 2 (camera) and Phase 3 (data cards)
+  const [daySummaries, setDaySummaries] = useState<Map<string, DaySummary>>(new Map());
+  const [weekSummaries, setWeekSummaries] = useState<Map<number, WeekSummary>>(new Map());
 
   // Time bounds of the data
   const [timeBounds, setTimeBounds] = useState<{ earliest: Date; latest: Date } | null>(null);
@@ -460,12 +464,14 @@ function App() {
 
         // Only calculate positions for plant-spawning entries (not Daily Mood)
         const plantEntries = sortedEntries.filter(entry => entry.kind !== 'Daily Mood');
-        const { positions: calculatedPositions, patches } = calculatePositionsWithDebug(plantEntries);
-        console.log(`Calculated positions for ${calculatedPositions.size} plant entries across ${patches.length} patches (${sortedEntries.length - plantEntries.length} Daily Mood entries excluded)`);
+        const { positions: calculatedPositions, debugInfo, daySummaries: daySums, weekSummaries: weekSums } = calculatePositionsWithDebug(plantEntries);
+        console.log(`Calculated positions for ${calculatedPositions.size} plant entries across ${debugInfo.weekRows.length} weeks (${sortedEntries.length - plantEntries.length} Daily Mood entries excluded)`);
 
         setAllEntries(sortedEntries);
         setPositions(calculatedPositions);
-        setPatchDebugInfo(patches);
+        setLayoutDebugInfo(debugInfo);
+        setDaySummaries(daySums);
+        setWeekSummaries(weekSums);
         setTimeBounds(bounds);
         // Start at the earliest time (empty garden, will grow as we advance)
         setCurrentTime(bounds.earliest);
@@ -839,9 +845,9 @@ function App() {
           );
         })}
 
-        {/* Patch debug overlay — dev mode only */}
+        {/* Layout debug overlay — dev mode only */}
         {isDevMode && devOverrides.patchDebugEnabled && (
-          <PatchDebugOverlay patches={patchDebugInfo} currentTime={currentTime} />
+          <PatchDebugOverlay debugInfo={layoutDebugInfo} />
         )}
 
         {/* Post-processing: bloom, god rays, vignette, saturation */}

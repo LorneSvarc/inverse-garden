@@ -19,8 +19,9 @@ import { getGardenLevelFadeModifier } from './gardenLevel';
 
 // Configuration - tunable parameters
 export const FADING_CONFIG = {
-  // Base lifespan in days before plant reaches 0 opacity
-  baseLifespanDays: 14,
+  // Base lifespan in days before plant reaches ghost opacity
+  // Garden level modifier extends/shortens this (9–54 day effective range)
+  baseLifespanDays: 18,
 
   // How much intensity (|valence|) affects lifespan
   // At max intensity, lifespan is multiplied by (1 + this value)
@@ -30,8 +31,11 @@ export const FADING_CONFIG = {
   // (Previously: saturationFadeSpeed: 1.5, minSaturation: 0.0)
   // Disabled because grey-fading conflicted with Content emotion (which IS grey)
 
-  // Minimum opacity before plant disappears
-  minOpacity: 0.0,
+  // Ghost opacity floor — faded plants leave barely-perceptible traces
+  minOpacity: 0.03,
+
+  // Below this threshold, plant stops rendering entirely (performance)
+  visibilityThreshold: 0.02,
 
   // Fade curve exponent (> 1 = slow start, fast end)
   // 2.0 means quadratic acceleration
@@ -127,8 +131,9 @@ export function calculateFadeState(
   // (Previously faded faster than opacity, but grey plants conflicted with Content emotion)
   const saturation = 1;
 
-  // Plant is visible if opacity is above threshold
-  const isVisible = opacity > FADING_CONFIG.minOpacity;
+  // Plant is visible if opacity is above the rendering threshold
+  // (minOpacity is the ghost floor; visibilityThreshold is when we stop rendering)
+  const isVisible = opacity > FADING_CONFIG.visibilityThreshold;
 
   return { opacity, saturation, isVisible };
 }

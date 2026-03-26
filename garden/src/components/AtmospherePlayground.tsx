@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { MoodEntryWithPercentile, PlantDNA, FlowerDNA, SproutDNA, DecayDNA } from '../types';
 import { parseCSVWithPercentiles } from '../utils/csvParser';
 import { entryToDNA } from '../utils/dnaMapper';
-import { calculatePositions, getLayoutConfig } from '../utils/positionCalculator';
+import { calculatePositions } from '../utils/positionCalculator';
 import { adjustColorSaturation } from '../utils/plantFading';
 import Flower3D from './Flower3D';
 import Sprout3D from './Sprout3D';
@@ -1024,8 +1024,7 @@ const PRESETS: Record<string, Partial<PlaygroundConfig>> = {
 // =============================================================================
 
 function Ground() {
-  const { gardenRadius } = getLayoutConfig();
-  const groundRadius = gardenRadius * 1.3;
+  const groundRadius = 12 * 1.3; // approximate garden radius for test scene
   const groundThickness = 3; // Thick ground slab
 
   return (

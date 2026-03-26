@@ -84,21 +84,26 @@ export function getGardenLevelFadeModifier(
   gardenLevel: number,
   plantType: 'flower' | 'sprout' | 'decay'
 ): number {
-  // Maximum modifier effect (±50% = 0.5 to 1.5 multiplier)
-  const maxModifier = 0.5;
-
-  // Normalize garden level to roughly -1 to 1 range
-  // This determines how strong the effect is
-  const normalizedLevel = Math.max(-1, Math.min(1, gardenLevel / 5));
+  // Normalize garden level to -1..1 range
+  // Divisor of 3 (down from 5) makes the system react to shorter emotional streaks
+  const normalizedLevel = Math.max(-1, Math.min(1, gardenLevel / 3));
 
   if (plantType === 'flower') {
-    // Negative garden level (lush) → flowers fade slower (multiplier < 1)
-    // Positive garden level (barren) → flowers fade faster (multiplier > 1)
-    return 1 + normalizedLevel * maxModifier;
+    // Asymmetric modifier — lush is generous, barren is aggressive
+    // Lush (normalizedLevel < 0): modifier 0.5–1.0 → flowers last up to 2× longer
+    // Barren (normalizedLevel > 0): modifier 1.0–2.0 → flowers last as short as 0.5×
+    if (normalizedLevel < 0) {
+      return 1 + normalizedLevel * 0.5;   // -1 → 0.5, 0 → 1.0
+    } else {
+      return 1 + normalizedLevel * 1.0;   // 0 → 1.0, +1 → 2.0
+    }
   } else if (plantType === 'decay') {
-    // Positive garden level (barren) → decays fade slower (multiplier < 1)
-    // Negative garden level (lush) → decays fade faster (multiplier > 1)
-    return 1 - normalizedLevel * maxModifier;
+    // Inverse of flower: barren = last longer, lush = fade faster
+    if (normalizedLevel > 0) {
+      return 1 - normalizedLevel * 0.5;   // +1 → 0.5, 0 → 1.0
+    } else {
+      return 1 - normalizedLevel * 1.0;   // 0 → 1.0, -1 → 2.0
+    }
   } else {
     // Sprouts are neutral - no garden level modifier
     return 1.0;

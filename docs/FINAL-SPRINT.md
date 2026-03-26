@@ -3,7 +3,7 @@
 ## Document Information
 
 **Status:** Active — Working Document
-**Updated:** March 4, 2026
+**Updated:** March 26, 2026
 **Reference:** `docs/inverse-garden-gdd-v4.0.md` (canonical spec — read first every session)
 **Purpose:** Track remaining tasks to get Inverse Garden exhibition-ready
 
@@ -95,7 +95,7 @@
 
 ---
 
-#### Phase 1: Positioning System Rewrite ⬜
+#### Phase 1: Positioning System Rewrite ✅ IMPLEMENTED — AWAITING LORNE REVIEW
 
 **What:** Replace the patch-based jittered grid with a calendar-structured week-per-row layout. Calendar weeks as rows (back-to-front, newest closest to camera), days as slots (left-to-right Monday–Sunday), entries clustered within day slots.
 
@@ -106,12 +106,41 @@
 - `patchConfig.ts` deleted — replaced by new `LAYOUT_CONFIG` in `environmentConfig.ts`
 
 **Steps:**
-- [ ] Pre-calculate day/week summaries (DaySummary, WeekSummary interfaces)
-- [ ] Implement week-per-row layout math (rowZ per week, slotX per day, entry clusters within slots)
-- [ ] Delete patch-based code (`generatePatches`, `orderPatchesSerpentine`, `positionEntriesInPatch`, `simulateTimeline`)
-- [ ] Delete `patchConfig.ts`, add `LAYOUT_CONFIG` to `environmentConfig.ts`
-- [ ] Validate: plants stay inside PLANT_BOUNDS, no overlapping, same entry always gets same position
+- [x] Pre-calculate day/week summaries (DaySummary, WeekSummary interfaces)
+- [x] Implement week-per-row layout math (rowZ per week, slotX per day, entry clusters within slots)
+- [x] Delete patch-based code (`generatePatches`, `orderPatchesSerpentine`, `positionEntriesInPatch`, `simulateTimeline`)
+- [x] Delete `patchConfig.ts`, add `LAYOUT_CONFIG` to `environmentConfig.ts`
+- [x] Validate: plants stay inside PLANT_BOUNDS, no overlapping, same entry always gets same position
 - [ ] **CHECK WITH LORNE:** Does the temporal structure read? Do weeks/days feel distinct?
+
+**Implementation notes (2026-03-04):**
+- 14 calendar weeks (Oct 13–Jan 18), 236 plant entries across 89 dates
+- Row spacing dynamically calculated to fit within PLANT_BOUNDS depth (28 / 14 = 2.0 per row)
+- Fixed timezone bug: `getDateString()` now uses local date instead of UTC to avoid day-boundary shifts (was producing 23 phantom weeks)
+- Z direction: oldest rows at negative Z (back, near LED wall), newest at positive Z (front, near camera)
+- `DaySummary` and `WeekSummary` maps pre-calculated at load time for Phase 2/3
+- Debug overlay updated: shows week row bands + day slot circles with labels (`?dev=true` → Layout Debug checkbox)
+- `AtmospherePlayground.tsx` updated to remove `getLayoutConfig()` dependency on deleted patch config
+- Legacy spiral code removed
+
+**Tuning round (2026-03-25):** Lorne reviewed and identified three issues: empty space / "moving rows" feel, day/week clusters not visually distinct, and flower bloom overlap. Changes:
+- **Fading system tuned:** `baseLifespanDays` 14→18, `minOpacity` 0→0.03 (barely-perceptible ghost traces), added `visibilityThreshold: 0.02`, isVisible check uses threshold instead of minOpacity floor
+- **Garden level modifier strengthened:** Asymmetric range (lush: 0.5–1.0, barren: 1.0–2.0 modifier), normalization divisor 5→3 for faster response. Effective lifespan range: 9–54 days depending on garden state and entry intensity.
+- **Cluster radius tightened:** `entryClusterRadius` 1.5→1.0. Day-to-day gap: 2.9 units (was 1.6). Row-to-row gap: 0.3 units (was -0.55 overlap).
+- **Bloom-width-aware spacing:** `positionEntriesInDaySlot()` now accepts bloom radii, sorts entries by bloom size (largest to outer rings), and inflates ring radii based on actual flower petal width × scale. Prevents worst-case bloom overlap.
+- Result: 234/307 plants visible at end of timeline (was ~30 before tuning). Ghost traces fill the garden without being distracting.
+
+**Lorne feedback on tuning (2026-03-26):**
+- Ghost flowers slightly distracting at 0.06 → lowered to 0.03
+- "Moving garden" effect persists (plants march back-to-front) — inherent to calendar layout, needs further thought on fill direction
+- Within-day ring placement uses seeded random angles — plants within same day may appear "left or behind" each other. This is by design (organic clustering) not a bug. Left as-is for now.
+
+**Bounds fix (2026-03-26):** Plants were appearing outside the raised bed because `clampToBounds()` used rectangular clamping but the bed is elliptical. Fixed to use elliptical containment with 0.95 inset factor.
+
+**Future items from this review:**
+- **Shrink-to-wilt animation** — As plants age, they shrink toward ground instead of just going translucent. Deferred to Animation Sprint (Task 5).
+- **Fill direction** — Whether to reverse newest-at-front to newest-at-back. Under consideration.
+- **Petal intersection** — Large flowers still have overlapping petals. Will partially resolve with stem leaning and flower variation (Task 3). Deferred.
 
 **Done when:** Garden shows clear week rows and day clusters. Timeline scrub fills rows chronologically. Lorne confirms.
 
@@ -301,6 +330,10 @@
 | 2026-02-19 | **Shader: DEFERRED** — Moebius post-processing pass fully reverted. All code removed, materials back to meshToonMaterial. | Outlines themselves looked good (hand-drawn illustration feel, plant silhouettes pop). But the three-stdlib EffectComposer pipeline couldn't achieve brightness parity with the normal render path. Root cause: EffectComposer's intermediate render targets + double tone mapping/sRGB encoding. Multiple fix attempts failed (manual ACES in shader, sRGB compensation, exposure bumps 0.9→1.3). Sky and highlights remained visibly darker. PBR material swap was also reverted since it was never validated independently. Could revisit with @react-three/postprocessing Effect class or different approach in Polish Sprint. |
 | 2026-03-02 | **Scale: Power curve applied, revisit later** — `percentileToScale()` changed from linear to `t^0.7`. Initial look OK but needs re-evaluation after Tasks 3/4. | Linear mapping made low-percentile plants indistinguishable. Power curve spreads low end (percentile 10 flower: 0.54→0.67 scale). Min/max ranges and FallenBloom range (1.0–3.6) still need evaluation with full scene context. |
 | 2026-03-04 | **Camera/Layout/Data Display spec adopted** — New task block added between Tasks 3 and 4. Task 7 absorbed by Phase 1. | Lorne's `Inverse-Garden-Camera-Layout-Plan.docx` defines week-per-row temporal layout, four-level camera zoom, and museum-label data cards. Phase 1 (positioning rewrite) is foundational — camera system and data display depend on it. Spec: `docs/inverse-garden-camera-layout-spec.md`. Partial overlap with Tasks 4A (composition) and 6 (UI) properly scoped — those tasks retain their non-overlapping responsibilities. |
+| 2026-03-25 | **Fading system retuned** — Base lifespan 14→18 days, ghost opacity added (0.03), garden level modifier made asymmetric (0.5–2.0) and more sensitive (normalize by 3). | Original 14-day lifespan with symmetric ±50% garden level modifier created too subtle a difference (11–20 day effective range). New system gives 9–54 day range — lush periods keep flowers for ~50 days (7 rows), barren periods ~9 days (1 row). Ghost opacity provides accumulated history without vanishing. |
+| 2026-03-25 | **Bloom-width-aware plant spacing** — Ring layout now considers actual petal width × scale to prevent overlap. | Flower bloom diameter at scale 1.8 = 4.3 units. Previous ring radius (1.275) put two flowers only 2.55 apart → heavy overlap. New system inflates rings based on `minRingRadius()` formula and sorts largest blooms to outer rings. |
+| 2026-03-26 | **Ghost opacity lowered** — 0.06→0.03. Ghosts were too visible/distracting. | At 0.03, ghosts are barely perceptible background texture rather than obviously translucent flowers. |
+| 2026-03-26 | **Elliptical bounds clamping** — `clampToBounds()` changed from rectangular to elliptical. | Bed is generated as an ellipse (`ExcavatedBed.tsx` `generateOrganicShape`), but position clamping was rectangular. Plants at corner positions passed the rectangle check but fell outside the bed. Now uses `(x/halfW)² + (z/halfD)² <= 1` with 0.95 inset factor. |
 
 ---
 
@@ -319,6 +352,9 @@ Items not in scope for this sprint. This list grows as the sprint progresses —
 | Cross-browser testing | Final pass before exhibition | Safari memory limits, Chrome compatibility |
 | Particle effects | Original GDD Phase 4 item | Never implemented, low priority |
 | Plant parameter variance: petal rows | May need investigation separately from general variance | Could produce weird shapes if varied too freely |
+| Shrink-to-wilt aging animation | Deferred to Animation Sprint (Task 5) | As plants age, they shrink toward ground instead of just going translucent. More "realistic" aging feel. Candidate for Task 5 alongside growth animations. |
+| Fill direction evaluation | Under consideration | Whether to reverse newest-at-front to newest-at-back so the garden "fills in behind" the camera instead of marching forward. |
+| Petal intersection for large flowers | Deferred to Task 3 (Plant Variance) | Large flowers still overlap petals within clusters. Will partially resolve with stem leaning variation and unique flower shapes. |
 
 ---
 

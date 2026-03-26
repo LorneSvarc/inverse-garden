@@ -1,59 +1,98 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';
-import type { PatchDebugInfo } from '../utils/positionCalculator';
+import type { LayoutDebugInfo } from '../utils/positionCalculator';
+import { LAYOUT_CONFIG } from '../config/environmentConfig';
 
-interface PatchDebugOverlayProps {
-  patches: PatchDebugInfo[];
-  currentTime: Date | null;
+interface LayoutDebugOverlayProps {
+  debugInfo: LayoutDebugInfo;
 }
 
-/**
- * Debug visualization for the patch-based positioning system.
- *
- * Renders translucent circles at each patch center showing:
- * - Green: assigned with live plants
- * - Grey: freed / available for reuse
- * - Blue outline: unassigned (never used)
- * - Small label with patch ID and assigned day
- */
-export default function PatchDebugOverlay({ patches, currentTime }: PatchDebugOverlayProps) {
-  const currentTimeMs = currentTime?.getTime() ?? 0;
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  const circles = useMemo(() => {
-    return patches.map((patch) => {
+/**
+ * Debug visualization for the week-per-row positioning system.
+ *
+ * Renders:
+ * - Translucent row bands for each week
+ * - Small circles at each day slot center
+ * - Labels with week date range and day slot info
+ */
+export default function PatchDebugOverlay({ debugInfo }: LayoutDebugOverlayProps) {
+  const { weekRows, daySlots } = debugInfo;
+
+  const rowHeight = LAYOUT_CONFIG.rowSpacing;
+  const slotWidth = LAYOUT_CONFIG.daySlotWidth;
+  const clusterRadius = LAYOUT_CONFIG.entryClusterRadius;
+
+  // Day slots colored by entry count
+  const coloredSlots = useMemo(() => {
+    return daySlots.map((slot) => {
       let color: string;
       let opacity: number;
 
-      if (!patch.assignedDay) {
-        // Unassigned — never used
+      if (slot.entryCount === 0) {
         color = '#4488ff';
-        opacity = 0.15;
-      } else if (patch.freedAtMs > 0 && patch.freedAtMs < currentTimeMs) {
-        // Freed — plants have fully faded
-        color = '#888888';
-        opacity = 0.1;
-      } else {
-        // Active — has live plants
+        opacity = 0.08;
+      } else if (slot.entryCount <= 2) {
         color = '#44cc44';
+        opacity = 0.15;
+      } else {
+        color = '#cccc44';
         opacity = 0.2;
       }
 
-      return { ...patch, color, opacity };
+      return { ...slot, color, opacity };
     });
-  }, [patches, currentTimeMs]);
+  }, [daySlots]);
 
   return (
     <group>
-      {circles.map((patch) => (
-        <group key={patch.id} position={[patch.center[0], 0.05, patch.center[1]]}>
-          {/* Circle outline */}
+      {/* Week row bands */}
+      {weekRows.map((row) => (
+        <group key={`week-${row.weekIndex}`} position={[0, 0.02, row.centerZ]}>
+          {/* Row background band */}
           <mesh rotation={[-Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[patch.radius - 0.05, patch.radius, 32]} />
+            <planeGeometry args={[slotWidth * 7, rowHeight * 0.9]} />
             <meshBasicMaterial
-              color={patch.color}
+              color={row.weekIndex % 2 === 0 ? '#335577' : '#553377'}
               transparent
-              opacity={patch.opacity + 0.2}
+              opacity={0.08}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+
+          {/* Week label */}
+          <Html
+            position={[-slotWidth * 3.5 - 1.5, 0.5, 0]}
+            center
+            style={{
+              fontSize: '9px',
+              color: 'white',
+              background: 'rgba(0,0,0,0.7)',
+              padding: '2px 5px',
+              borderRadius: '3px',
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          >
+            W{row.weekIndex} · {row.startDate.slice(5)}→{row.endDate.slice(5)} ({row.entryCount})
+          </Html>
+        </group>
+      ))}
+
+      {/* Day slot circles */}
+      {coloredSlots.map((slot) => (
+        <group key={`day-${slot.dateStr}`} position={[slot.center[0], 0.04, slot.center[1]]}>
+          {/* Cluster radius circle */}
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[clusterRadius - 0.03, clusterRadius, 24]} />
+            <meshBasicMaterial
+              color={slot.color}
+              transparent
+              opacity={slot.opacity + 0.15}
               side={THREE.DoubleSide}
               depthWrite={false}
             />
@@ -61,34 +100,33 @@ export default function PatchDebugOverlay({ patches, currentTime }: PatchDebugOv
 
           {/* Filled circle */}
           <mesh rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[patch.radius, 32]} />
+            <circleGeometry args={[clusterRadius, 24]} />
             <meshBasicMaterial
-              color={patch.color}
+              color={slot.color}
               transparent
-              opacity={patch.opacity}
+              opacity={slot.opacity}
               side={THREE.DoubleSide}
               depthWrite={false}
             />
           </mesh>
 
-          {/* Label */}
+          {/* Day label */}
           <Html
             position={[0, 0.5, 0]}
             center
             style={{
-              fontSize: '10px',
+              fontSize: '9px',
               color: 'white',
               background: 'rgba(0,0,0,0.6)',
-              padding: '2px 4px',
-              borderRadius: '3px',
+              padding: '1px 3px',
+              borderRadius: '2px',
               whiteSpace: 'nowrap',
               pointerEvents: 'none',
               userSelect: 'none',
             }}
           >
-            #{patch.id}
-            {patch.assignedDay ? ` · ${patch.assignedDay.slice(5)}` : ''}
-            {patch.plantCount > 0 ? ` (${patch.plantCount})` : ''}
+            {DAY_LABELS[slot.dayIndex]} · {slot.dateStr.slice(5)}
+            {slot.entryCount > 0 ? ` (${slot.entryCount})` : ''}
           </Html>
         </group>
       ))}

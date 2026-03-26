@@ -1,17 +1,22 @@
 import type { MoodEntryWithPercentile } from '../types';
-import { PLANT_BOUNDS } from '../config/environmentConfig';
-import { PATCH_CONFIG } from '../config/patchConfig';
-import { getEffectiveLifespan } from './plantFading';
+import { PLANT_BOUNDS, LAYOUT_CONFIG } from '../config/environmentConfig';
+import { getPlantType, calculateScaleFromPercentile } from './dnaMapper';
+
+// Approximate horizontal bloom radius at scale 1.0
+// These match current defaults in dnaMapper.ts — update when flowers become unique
+const BLOOM_RADIUS_AT_SCALE_1: Record<string, number> = {
+  flower: 1.2,    // FLOWER_DEFAULTS.petalLength (petals extend this far from center)
+  decay: 0.35,    // FALLEN_BLOOM_DEFAULTS.petalLength
+  sprout: 0.15,   // negligible
+};
 
 /**
- * Patch-Based Plant Positioning System
+ * Week-Per-Row Plant Positioning System
  *
- * Replaces the spiral-scatter system with a patch-grid approach:
- *
- * 1. Generate ~28 patches as a jittered grid across the planting bed
- * 2. Order patches in serpentine (back-and-forth row sweep)
- * 3. Assign each calendar day to a patch, reusing freed patches
- * 4. Position entries within their patch using ring-based layouts
+ * Calendar-structured layout where time is readable at every scale:
+ * - Each calendar week maps to one spatial row (back-to-front, oldest→newest)
+ * - Within each row, days run left-to-right (Monday→Sunday)
+ * - Within each day, entries cluster together using ring-based layouts
  *
  * All randomness is seeded for reproducibility.
  * Positions are calculated ONCE at data load time.
@@ -21,32 +26,50 @@ import { getEffectiveLifespan } from './plantFading';
 // TYPES
 // ============================================
 
-interface Patch {
-  id: number;
-  center: [number, number]; // [x, z]
-  assignedDay: string | null; // YYYY-MM-DD or null if unassigned
-  plantIds: string[];
-  freedAtMs: number; // timestamp when all plants in this patch have fully faded
+export interface DaySummary {
+  dateStr: string;
+  entryCount: number;
+  topEmotions: string[];       // top 2-3 by frequency
+  center: [number, number, number]; // bounding box center of day's plants
 }
 
-// Exported for debug overlay
-export interface PatchDebugInfo {
-  id: number;
-  center: [number, number];
-  radius: number;
-  assignedDay: string | null;
-  plantCount: number;
-  freedAtMs: number;
+export interface WeekSummary {
+  weekIndex: number;
+  startDate: Date;
+  endDate: Date;
+  flowerCount: number;
+  sproutCount: number;
+  decayCount: number;
+  topEmotions: string[];       // top 2 by frequency for the week
+  center: [number, number, number]; // bounding box center of week row
+}
+
+// Debug overlay info
+export interface LayoutDebugInfo {
+  weekRows: WeekRowDebug[];
+  daySlots: DaySlotDebug[];
+}
+
+export interface WeekRowDebug {
+  weekIndex: number;
+  centerZ: number;
+  startDate: string;
+  endDate: string;
+  entryCount: number;
+}
+
+export interface DaySlotDebug {
+  dateStr: string;
+  weekIndex: number;
+  dayIndex: number;        // 0=Monday, 6=Sunday
+  center: [number, number]; // [x, z]
+  entryCount: number;
 }
 
 // ============================================
 // SEEDED RANDOM NUMBER GENERATOR
 // ============================================
 
-/**
- * Simple seeded PRNG using mulberry32 algorithm
- * Returns a function that generates numbers 0-1
- */
 function createSeededRandom(seed: number): () => number {
   return function () {
     let t = (seed += 0x6d2b79f5);
@@ -56,16 +79,10 @@ function createSeededRandom(seed: number): () => number {
   };
 }
 
-/**
- * Generate a seed from a timestamp
- */
 function timestampToSeed(timestamp: Date): number {
   return timestamp.getTime();
 }
 
-/**
- * Generate a seed from a date string (YYYY-MM-DD)
- */
 function dateStringToSeed(dateStr: string): number {
   let hash = 0;
   for (let i = 0; i < dateStr.length; i++) {
@@ -76,291 +93,228 @@ function dateStringToSeed(dateStr: string): number {
   return Math.abs(hash);
 }
 
-/**
- * Get the date string (YYYY-MM-DD) from a timestamp
- */
 function getDateString(timestamp: Date): string {
-  return timestamp.toISOString().split('T')[0];
+  // Use local date (not UTC) to avoid timezone-shifted day boundaries
+  const y = timestamp.getFullYear();
+  const m = String(timestamp.getMonth() + 1).padStart(2, '0');
+  const d = String(timestamp.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 // ============================================
-// STEP 1: GENERATE PATCHES
+// LAYOUT MATH
 // ============================================
 
-// Rectangular half-extents for patch placement (inset from PLANT_BOUNDS edges)
-const HALF_W = PLANT_BOUNDS.width / 2 - 2; // 15
-const HALF_D = PLANT_BOUNDS.depth / 2 - 2; // 12
+const HALF_W = PLANT_BOUNDS.width / 2;   // 17
+const HALF_D = PLANT_BOUNDS.depth / 2;   // 14
 
 /**
- * Generate patches as a jittered grid across the planting bed.
- *
- * Creates a 5×6 base grid, jitters each point, and filters to
- * stay within bounds. Result: ~25-28 organic-feeling patch positions.
+ * Get the Monday of the week for a given date (ISO weeks start Monday).
+ * Returns YYYY-MM-DD string for that Monday.
  */
-function generatePatches(seed: number): Patch[] {
-  const random = createSeededRandom(seed);
-
-  const cols = 5;
-  const rows = 6;
-
-  // Effective area: 2*HALF_W × 2*HALF_D = 30 × 24
-  const cellW = (2 * HALF_W) / cols; // 6.0
-  const cellD = (2 * HALF_D) / rows; // 4.0
-
-  const patches: Patch[] = [];
-  let id = 0;
-
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      // Base grid position (center of each cell)
-      const baseX = -HALF_W + (col + 0.5) * cellW;
-      const baseZ = -HALF_D + (row + 0.5) * cellD;
-
-      // Jitter: random offset within ±(jitter * cellSize)
-      const jitterX = (random() - 0.5) * 2 * PATCH_CONFIG.gridJitter * cellW;
-      const jitterZ = (random() - 0.5) * 2 * PATCH_CONFIG.gridJitter * cellD;
-
-      const x = baseX + jitterX;
-      const z = baseZ + jitterZ;
-
-      // Only keep if within bounds
-      if (x >= -HALF_W && x <= HALF_W && z >= -HALF_D && z <= HALF_D) {
-        patches.push({
-          id: id++,
-          center: [x, z],
-          assignedDay: null,
-          plantIds: [],
-          freedAtMs: 0,
-        });
-      }
-    }
-  }
-
-  return patches;
+function getWeekMonday(date: Date): string {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  // getDay(): 0=Sunday, 1=Monday, ..., 6=Saturday
+  // We want Monday as day 0: offset = (getDay() + 6) % 7
+  const dayOfWeek = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - dayOfWeek);
+  return getDateString(d);
 }
 
-// ============================================
-// STEP 2: SERPENTINE ORDERING
-// ============================================
-
 /**
- * Order patches in serpentine fill order.
- *
- * Groups by approximate row (z-coordinate bands), then alternates
- * left-to-right and right-to-left across rows. This creates
- * temporal-spatial locality: time sweeps across the bed.
+ * Get the day-of-week index (0=Monday, 6=Sunday) for a date.
  */
-function orderPatchesSerpentine(patches: Patch[]): Patch[] {
-  if (patches.length === 0) return [];
-
-  // Find z-range and divide into row bands
-  const zValues = patches.map(p => p.center[1]);
-  const minZ = Math.min(...zValues);
-  const maxZ = Math.max(...zValues);
-  const zRange = maxZ - minZ;
-
-  // Use 6 row bands (matching our grid rows)
-  const rowCount = 6;
-  const bandHeight = zRange / rowCount;
-
-  // Assign each patch to a row band
-  const rowBuckets: Patch[][] = Array.from({ length: rowCount }, () => []);
-  for (const patch of patches) {
-    let rowIndex = Math.floor((patch.center[1] - minZ) / bandHeight);
-    rowIndex = Math.min(rowIndex, rowCount - 1); // clamp
-    rowBuckets[rowIndex].push(patch);
-  }
-
-  // Sort within each row by x, alternating direction
-  const ordered: Patch[] = [];
-  for (let row = 0; row < rowCount; row++) {
-    const bucket = rowBuckets[row];
-    bucket.sort((a, b) => a.center[0] - b.center[0]);
-    if (row % 2 === 1) {
-      bucket.reverse(); // Odd rows go right-to-left
-    }
-    ordered.push(...bucket);
-  }
-
-  return ordered;
+function getDayIndex(date: Date): number {
+  return (date.getDay() + 6) % 7;
 }
 
-// ============================================
-// STEP 3: SIMULATE TIMELINE FOR PATCH REUSE
-// ============================================
-
 /**
- * Assign each calendar day to a patch.
- *
- * Walks through days chronologically, assigning each to the next
- * available patch in serpentine order. When all patches are used,
- * reuses the earliest-freed patch.
- *
- * Uses getEffectiveLifespan from plantFading.ts to estimate when
- * plants will fully fade (at neutral garden level, modifier = 1.0).
+ * Calculate row Z position for a given week index.
+ * Row 0 (oldest) is at the back (negative Z, far from camera).
+ * Last row (newest) is at the front (positive Z, close to camera).
+ * Row spacing is dynamically calculated to fit all rows within PLANT_BOUNDS.
  */
-function simulateTimeline(
-  patches: Patch[],
-  entriesByDate: Map<string, MoodEntryWithPercentile[]>,
-  sortedDays: string[]
-): Map<string, number> {
-  // Map from day string to patch index
-  const dayToPatch = new Map<string, number>();
+function getRowZ(rowIndex: number, totalRows: number): number {
+  const rowSpacing = Math.min(LAYOUT_CONFIG.rowSpacing, PLANT_BOUNDS.depth / Math.max(totalRows, 1));
+  const totalDepthUsed = totalRows * rowSpacing;
+  const marginZ = (PLANT_BOUNDS.depth - totalDepthUsed) / 2;
+  // Row 0 = most negative Z (back), last row = most positive Z (front)
+  return -HALF_D + marginZ + rowIndex * rowSpacing + rowSpacing / 2;
+}
 
-  // Track which patches are available via a simple scan
-  let nextUnusedIndex = 0;
-
-  for (const dayStr of sortedDays) {
-    const dayEntries = entriesByDate.get(dayStr)!;
-    const dayFirstEntryMs = dayEntries[0].timestamp.getTime();
-
-    let assignedPatchIndex = -1;
-
-    // First: try the next unassigned patch
-    if (nextUnusedIndex < patches.length) {
-      assignedPatchIndex = nextUnusedIndex;
-      nextUnusedIndex++;
-    } else {
-      // All patches used — find one that's freed
-      // Look for the patch that freed earliest and is available
-      let earliestFreed = Infinity;
-      let earliestFreedIndex = -1;
-
-      for (let i = 0; i < patches.length; i++) {
-        const patch = patches[i];
-        if (
-          patch.freedAtMs > 0 &&
-          patch.freedAtMs < dayFirstEntryMs &&
-          patch.freedAtMs < earliestFreed
-        ) {
-          earliestFreed = patch.freedAtMs;
-          earliestFreedIndex = i;
-        }
-      }
-
-      if (earliestFreedIndex >= 0) {
-        assignedPatchIndex = earliestFreedIndex;
-      } else {
-        // Fallback: force reuse of the oldest assigned patch
-        let oldestAssignMs = Infinity;
-        let oldestIndex = 0;
-        for (let i = 0; i < patches.length; i++) {
-          const patch = patches[i];
-          if (patch.assignedDay) {
-            const assignedEntries = entriesByDate.get(patch.assignedDay);
-            if (assignedEntries) {
-              const assignMs = assignedEntries[0].timestamp.getTime();
-              if (assignMs < oldestAssignMs) {
-                oldestAssignMs = assignMs;
-                oldestIndex = i;
-              }
-            }
-          }
-        }
-        assignedPatchIndex = oldestIndex;
-      }
-    }
-
-    // Assign this day to the patch
-    const patch = patches[assignedPatchIndex];
-    patch.assignedDay = dayStr;
-    patch.plantIds = dayEntries.map(e => e.id);
-
-    // Estimate when this patch's plants will be fully faded
-    // Take the LATEST entry's timestamp + LONGEST lifespan
-    let latestFadeMs = 0;
-    for (const entry of dayEntries) {
-      const lifespanMs = getEffectiveLifespan(entry.valence);
-      const fadeMs = entry.timestamp.getTime() + lifespanMs;
-      if (fadeMs > latestFadeMs) {
-        latestFadeMs = fadeMs;
-      }
-    }
-
-    // Add grace period
-    const graceMs = PATCH_CONFIG.reuseGraceDays * 24 * 60 * 60 * 1000;
-    patch.freedAtMs = latestFadeMs + graceMs;
-
-    dayToPatch.set(dayStr, assignedPatchIndex);
-  }
-
-  return dayToPatch;
+/**
+ * Calculate slot X position for a given day index (0=Monday, 6=Sunday).
+ * Monday is on the left, Sunday on the right.
+ */
+function getSlotX(dayIndex: number): number {
+  const totalWidthUsed = LAYOUT_CONFIG.daysPerRow * LAYOUT_CONFIG.daySlotWidth;
+  const marginX = (PLANT_BOUNDS.width - totalWidthUsed) / 2;
+  return -HALF_W + marginX + dayIndex * LAYOUT_CONFIG.daySlotWidth + LAYOUT_CONFIG.daySlotWidth / 2;
 }
 
 // ============================================
-// STEP 4: POSITION ENTRIES WITHIN A PATCH
+// ENTRY CLUSTERING WITHIN A DAY SLOT
 // ============================================
 
 /**
- * Position entries within their assigned patch using ring-based layouts.
+ * Calculate the minimum ring radius so adjacent entries don't overlap.
+ * For N entries on a ring, angular separation is 2π/N.
+ * Two adjacent blooms overlap if: radius × 2 × sin(π/N) < maxBloomDiameter
+ */
+function minRingRadius(countOnRing: number, maxBloomDiameter: number): number {
+  if (countOnRing <= 1) return 0;
+  return maxBloomDiameter / (2 * Math.sin(Math.PI / countOnRing));
+}
+
+/**
+ * Position entries within their day slot using ring-based layouts.
+ * Entries are sorted by bloom radius (largest to outer rings) and ring radii
+ * are inflated based on actual bloom widths to prevent overlap.
  *
  * | Count | Layout     | Details                                           |
  * |-------|------------|---------------------------------------------------|
- * | 1     | Center     | Small seeded offset ±0.5 from patch center        |
- * | 2-3   | Circle     | Radius = stemSpacing/2, evenly spaced angles      |
- * | 4-6   | Dual ring  | 1-2 inner (r~1.4), rest outer (r~2.8)            |
+ * | 1     | Center     | Small seeded offset from slot center              |
+ * | 2-3   | Circle     | Evenly spaced, radius based on bloom width        |
+ * | 4-6   | Dual ring  | Small inner, large outer                          |
+ * | 7+    | Triple ring| Inner, middle, outer rings                        |
  */
-function positionEntriesInPatch(
+function positionEntriesInDaySlot(
   entries: MoodEntryWithPercentile[],
-  patchCenter: [number, number],
-  patchRadius: number
+  slotCenter: [number, number],
+  clusterRadius: number,
+  bloomRadii: number[]
 ): Map<string, [number, number, number]> {
   const positions = new Map<string, [number, number, number]>();
   const count = entries.length;
 
   if (count === 0) return positions;
 
-  // Use first entry's timestamp as seed for deterministic layout
-  const random = createSeededRandom(timestampToSeed(entries[0].timestamp) + dateStringToSeed(getDateString(entries[0].timestamp)));
+  // Sort indices by bloom radius descending — largest blooms go to outer rings
+  const sortedIndices = entries.map((_, i) => i)
+    .sort((a, b) => bloomRadii[b] - bloomRadii[a]);
+
+  const random = createSeededRandom(
+    timestampToSeed(entries[0].timestamp) + dateStringToSeed(getDateString(entries[0].timestamp))
+  );
+
+  // Max radius cap: don't spill too far into adjacent slots
+  const maxRadius = clusterRadius * 1.3;
 
   if (count === 1) {
-    // Single entry: small offset from center
-    const offsetX = (random() - 0.5) * 1.0;
-    const offsetZ = (random() - 0.5) * 1.0;
-    const x = clampToBounds(patchCenter[0] + offsetX, patchCenter[1] + offsetZ)[0];
-    const z = clampToBounds(patchCenter[0] + offsetX, patchCenter[1] + offsetZ)[1];
-    positions.set(entries[0].id, [x, 0, z]);
+    const idx = sortedIndices[0];
+    const offsetX = (random() - 0.5) * 0.8;
+    const offsetZ = (random() - 0.5) * 0.8;
+    const [cx, cz] = clampToBounds(slotCenter[0] + offsetX, slotCenter[1] + offsetZ);
+    positions.set(entries[idx].id, [cx, 0, cz]);
   } else if (count <= 3) {
-    // 2-3 entries: single ring
-    const radius = Math.min(PATCH_CONFIG.stemSpacing / 2, patchRadius * 0.5);
+    // All on one ring
+    const maxBloom = Math.max(...sortedIndices.map(i => bloomRadii[i])) * 2;
+    const baseRadius = clusterRadius * 0.4;
+    const radius = Math.min(maxRadius, Math.max(baseRadius, minRingRadius(count, maxBloom)));
     const baseAngle = random() * Math.PI * 2;
     const angleStep = (Math.PI * 2) / count;
 
     for (let i = 0; i < count; i++) {
+      const idx = sortedIndices[i];
       const angle = baseAngle + i * angleStep;
-      const x = patchCenter[0] + Math.cos(angle) * radius;
-      const z = patchCenter[1] + Math.sin(angle) * radius;
+      const x = slotCenter[0] + Math.cos(angle) * radius;
+      const z = slotCenter[1] + Math.sin(angle) * radius;
       const [cx, cz] = clampToBounds(x, z);
-      positions.set(entries[i].id, [cx, 0, cz]);
+      positions.set(entries[idx].id, [cx, 0, cz]);
     }
-  } else {
-    // 4-6 entries: dual ring
+  } else if (count <= 6) {
+    // Dual ring: smallest blooms inner, largest outer
     const innerCount = Math.min(2, Math.floor(count / 2));
     const outerCount = count - innerCount;
+    const innerIndices = sortedIndices.slice(sortedIndices.length - innerCount); // smallest
+    const outerIndices = sortedIndices.slice(0, outerCount); // largest
 
-    const innerRadius = Math.min(PATCH_CONFIG.stemSpacing * 0.4, patchRadius * 0.35);
-    const outerRadius = Math.min(PATCH_CONFIG.stemSpacing * 0.8, patchRadius * 0.7);
+    const innerMaxBloom = Math.max(...innerIndices.map(i => bloomRadii[i])) * 2;
+    const outerMaxBloom = Math.max(...outerIndices.map(i => bloomRadii[i])) * 2;
 
-    // Inner ring
+    const innerRadius = Math.min(maxRadius * 0.5, Math.max(clusterRadius * 0.2, minRingRadius(innerCount, innerMaxBloom)));
+    const outerRadius = Math.min(maxRadius, Math.max(clusterRadius * 0.6, minRingRadius(outerCount, outerMaxBloom)));
+
     const innerBaseAngle = random() * Math.PI * 2;
     const innerAngleStep = (Math.PI * 2) / innerCount;
     for (let i = 0; i < innerCount; i++) {
+      const idx = innerIndices[i];
       const angle = innerBaseAngle + i * innerAngleStep;
-      const x = patchCenter[0] + Math.cos(angle) * innerRadius;
-      const z = patchCenter[1] + Math.sin(angle) * innerRadius;
+      const x = slotCenter[0] + Math.cos(angle) * innerRadius;
+      const z = slotCenter[1] + Math.sin(angle) * innerRadius;
       const [cx, cz] = clampToBounds(x, z);
-      positions.set(entries[i].id, [cx, 0, cz]);
+      positions.set(entries[idx].id, [cx, 0, cz]);
     }
 
-    // Outer ring — offset from inner to avoid radial alignment
     const outerBaseAngle = innerBaseAngle + Math.PI / outerCount;
     const outerAngleStep = (Math.PI * 2) / outerCount;
     for (let i = 0; i < outerCount; i++) {
+      const idx = outerIndices[i];
       const angle = outerBaseAngle + i * outerAngleStep;
-      const x = patchCenter[0] + Math.cos(angle) * outerRadius;
-      const z = patchCenter[1] + Math.sin(angle) * outerRadius;
+      const x = slotCenter[0] + Math.cos(angle) * outerRadius;
+      const z = slotCenter[1] + Math.sin(angle) * outerRadius;
       const [cx, cz] = clampToBounds(x, z);
-      positions.set(entries[innerCount + i].id, [cx, 0, cz]);
+      positions.set(entries[idx].id, [cx, 0, cz]);
+    }
+  } else {
+    // 7+ entries: triple ring
+    const innerCount = 2;
+    const middleCount = Math.min(4, count - innerCount);
+    const outerCount = count - innerCount - middleCount;
+
+    // Largest blooms → outer, smallest → inner
+    const outerIndices = sortedIndices.slice(0, outerCount);
+    const middleIndices = sortedIndices.slice(outerCount, outerCount + middleCount);
+    const innerIndices = sortedIndices.slice(outerCount + middleCount);
+
+    const innerMaxBloom = Math.max(...innerIndices.map(i => bloomRadii[i])) * 2;
+    const middleMaxBloom = Math.max(...middleIndices.map(i => bloomRadii[i])) * 2;
+
+    const innerRadius = Math.min(maxRadius * 0.3, Math.max(clusterRadius * 0.15, minRingRadius(innerCount, innerMaxBloom)));
+    const middleRadius = Math.min(maxRadius * 0.6, Math.max(clusterRadius * 0.4, minRingRadius(middleCount, middleMaxBloom)));
+    let outerRadius = clusterRadius * 0.85;
+    if (outerCount > 0) {
+      const outerMaxBloom = Math.max(...outerIndices.map(i => bloomRadii[i])) * 2;
+      outerRadius = Math.min(maxRadius, Math.max(clusterRadius * 0.7, minRingRadius(outerCount, outerMaxBloom)));
+    }
+
+    const baseAngle = random() * Math.PI * 2;
+
+    // Inner ring
+    const innerStep = (Math.PI * 2) / innerCount;
+    for (let i = 0; i < innerCount; i++) {
+      const idx = innerIndices[i];
+      const angle = baseAngle + i * innerStep;
+      const x = slotCenter[0] + Math.cos(angle) * innerRadius;
+      const z = slotCenter[1] + Math.sin(angle) * innerRadius;
+      const [cx, cz] = clampToBounds(x, z);
+      positions.set(entries[idx].id, [cx, 0, cz]);
+    }
+
+    // Middle ring
+    const middleBaseAngle = baseAngle + Math.PI / middleCount;
+    const middleStep = (Math.PI * 2) / middleCount;
+    for (let i = 0; i < middleCount; i++) {
+      const idx = middleIndices[i];
+      const angle = middleBaseAngle + i * middleStep;
+      const x = slotCenter[0] + Math.cos(angle) * middleRadius;
+      const z = slotCenter[1] + Math.sin(angle) * middleRadius;
+      const [cx, cz] = clampToBounds(x, z);
+      positions.set(entries[idx].id, [cx, 0, cz]);
+    }
+
+    // Outer ring
+    if (outerCount > 0) {
+      const outerBaseAngle = baseAngle + Math.PI / (outerCount * 2);
+      const outerStep = (Math.PI * 2) / outerCount;
+      for (let i = 0; i < outerCount; i++) {
+        const idx = outerIndices[i];
+        const angle = outerBaseAngle + i * outerStep;
+        const x = slotCenter[0] + Math.cos(angle) * outerRadius;
+        const z = slotCenter[1] + Math.sin(angle) * outerRadius;
+        const [cx, cz] = clampToBounds(x, z);
+        positions.set(entries[idx].id, [cx, 0, cz]);
+      }
     }
   }
 
@@ -368,13 +322,56 @@ function positionEntriesInPatch(
 }
 
 /**
- * Clamp a position to the rectangular plant bounds.
+ * Clamp position to elliptical bounds matching the actual bed shape.
+ * The bed is generated as an ellipse (ExcavatedBed's generateOrganicShape),
+ * not a rectangle, so we use elliptical containment.
  */
 function clampToBounds(x: number, z: number): [number, number] {
-  return [
-    Math.max(-HALF_W, Math.min(HALF_W, x)),
-    Math.max(-HALF_D, Math.min(HALF_D, z)),
-  ];
+  const nx = x / HALF_W;
+  const nz = z / HALF_D;
+  const dist = nx * nx + nz * nz;
+
+  if (dist <= 1) return [x, z]; // inside ellipse
+
+  // Project onto ellipse boundary with slight inset so petals don't overshoot
+  const scale = 0.95 / Math.sqrt(dist);
+  return [x * scale, z * scale];
+}
+
+// ============================================
+// EMOTION FREQUENCY HELPERS
+// ============================================
+
+/**
+ * Count emotion frequencies across entries and return top N.
+ */
+function getTopEmotions(entries: MoodEntryWithPercentile[], topN: number): string[] {
+  const counts = new Map<string, number>();
+  for (const entry of entries) {
+    for (const emotion of entry.emotions) {
+      counts.set(emotion, (counts.get(emotion) ?? 0) + 1);
+    }
+  }
+  return Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topN)
+    .map(([emotion]) => emotion);
+}
+
+/**
+ * Calculate bounding box center of positions.
+ */
+function boundingBoxCenter(positions: [number, number, number][]): [number, number, number] {
+  if (positions.length === 0) return [0, 0, 0];
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+  for (const [x, y, z] of positions) {
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+    minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
+  }
+  return [(minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2];
 }
 
 // ============================================
@@ -382,10 +379,10 @@ function clampToBounds(x: number, z: number): [number, number] {
 // ============================================
 
 /**
- * Calculate stable positions for all entries using the patch-based system.
+ * Calculate stable positions for all entries using the week-per-row layout.
  *
  * Called ONCE at data load time. Returns a Map from entry ID to [x, y, z].
- * Same signature as previous spiral implementation.
+ * Same signature as previous implementation — App.tsx does not need changes.
  */
 export function calculatePositions(
   entries: MoodEntryWithPercentile[]
@@ -394,13 +391,7 @@ export function calculatePositions(
     return new Map();
   }
 
-  // --- Step 1: Generate patches ---
-  const patches = generatePatches(PATCH_CONFIG.seed);
-
-  // --- Step 2: Order patches serpentine ---
-  const orderedPatches = orderPatchesSerpentine(patches);
-
-  // --- Step 3: Group entries by date ---
+  // --- Group entries by date ---
   const entriesByDate = new Map<string, MoodEntryWithPercentile[]>();
   for (const entry of entries) {
     const dateStr = getDateString(entry.timestamp);
@@ -410,27 +401,52 @@ export function calculatePositions(
     entriesByDate.get(dateStr)!.push(entry);
   }
 
-  // Sort days chronologically
-  const sortedDays = Array.from(entriesByDate.keys()).sort();
+  // --- Assign days to weeks ---
+  const weekMondaySet = new Set<string>();
+  const dayToWeekMonday = new Map<string, string>();
 
-  // --- Step 4: Simulate timeline to assign days → patches ---
-  const dayToPatch = simulateTimeline(orderedPatches, entriesByDate, sortedDays);
+  for (const [dateStr, dayEntries] of entriesByDate) {
+    const monday = getWeekMonday(dayEntries[0].timestamp);
+    weekMondaySet.add(monday);
+    dayToWeekMonday.set(dateStr, monday);
+  }
 
-  // --- Step 5: Position entries within their patches ---
+  // Sort week Mondays chronologically → rowIndex
+  const sortedWeekMondays = Array.from(weekMondaySet).sort();
+  const mondayToRowIndex = new Map<string, number>();
+  sortedWeekMondays.forEach((monday, index) => {
+    mondayToRowIndex.set(monday, index);
+  });
+
+  const totalRows = sortedWeekMondays.length;
+
+  // --- Position entries ---
   const positions = new Map<string, [number, number, number]>();
 
-  for (const [dayStr, dayEntries] of entriesByDate) {
-    const patchIndex = dayToPatch.get(dayStr);
-    if (patchIndex === undefined) continue;
+  for (const [dateStr, dayEntries] of entriesByDate) {
+    const weekMonday = dayToWeekMonday.get(dateStr)!;
+    const rowIndex = mondayToRowIndex.get(weekMonday)!;
+    const dayIndex = getDayIndex(dayEntries[0].timestamp);
 
-    const patch = orderedPatches[patchIndex];
-    const patchPositions = positionEntriesInPatch(
+    const slotX = getSlotX(dayIndex);
+    const rowZ = getRowZ(rowIndex, totalRows);
+    const slotCenter: [number, number] = [slotX, rowZ];
+
+    // Compute bloom radius for each entry (horizontal footprint)
+    const bloomRadii = dayEntries.map(entry => {
+      const plantType = getPlantType(entry.valenceClassification);
+      const scale = calculateScaleFromPercentile(entry.scalePercentile, plantType);
+      return (BLOOM_RADIUS_AT_SCALE_1[plantType] ?? 0.15) * scale;
+    });
+
+    const slotPositions = positionEntriesInDaySlot(
       dayEntries,
-      patch.center,
-      PATCH_CONFIG.patchRadius
+      slotCenter,
+      LAYOUT_CONFIG.entryClusterRadius,
+      bloomRadii
     );
 
-    for (const [id, pos] of patchPositions) {
+    for (const [id, pos] of slotPositions) {
       positions.set(id, pos);
     }
   }
@@ -439,26 +455,26 @@ export function calculatePositions(
 }
 
 /**
- * Get patch debug info for the overlay visualization.
- * Call after calculatePositions to get the current patch state.
+ * Calculate positions and build summary/debug metadata for Phases 2 & 3.
  */
-let _lastPatches: Patch[] = [];
-let _lastDayToPatch: Map<string, number> = new Map();
-
 export function calculatePositionsWithDebug(
   entries: MoodEntryWithPercentile[]
-): { positions: Map<string, [number, number, number]>; patches: PatchDebugInfo[] } {
+): {
+  positions: Map<string, [number, number, number]>;
+  debugInfo: LayoutDebugInfo;
+  daySummaries: Map<string, DaySummary>;
+  weekSummaries: Map<number, WeekSummary>;
+} {
   if (entries.length === 0) {
-    return { positions: new Map(), patches: [] };
+    return {
+      positions: new Map(),
+      debugInfo: { weekRows: [], daySlots: [] },
+      daySummaries: new Map(),
+      weekSummaries: new Map(),
+    };
   }
 
-  // --- Step 1: Generate patches ---
-  const patches = generatePatches(PATCH_CONFIG.seed);
-
-  // --- Step 2: Order patches serpentine ---
-  const orderedPatches = orderPatchesSerpentine(patches);
-
-  // --- Step 3: Group entries by date ---
+  // --- Group entries by date ---
   const entriesByDate = new Map<string, MoodEntryWithPercentile[]>();
   for (const entry of entries) {
     const dateStr = getDateString(entry.timestamp);
@@ -468,145 +484,165 @@ export function calculatePositionsWithDebug(
     entriesByDate.get(dateStr)!.push(entry);
   }
 
-  const sortedDays = Array.from(entriesByDate.keys()).sort();
+  // --- Assign days to weeks ---
+  const weekMondaySet = new Set<string>();
+  const dayToWeekMonday = new Map<string, string>();
 
-  // --- Step 4: Simulate timeline ---
-  const dayToPatch = simulateTimeline(orderedPatches, entriesByDate, sortedDays);
-
-  // Store for debug
-  _lastPatches = orderedPatches;
-  _lastDayToPatch = dayToPatch;
-
-  // --- Step 5: Position entries ---
-  const positions = new Map<string, [number, number, number]>();
-
-  for (const [dayStr, dayEntries] of entriesByDate) {
-    const patchIndex = dayToPatch.get(dayStr);
-    if (patchIndex === undefined) continue;
-
-    const patch = orderedPatches[patchIndex];
-    const patchPositions = positionEntriesInPatch(
-      dayEntries,
-      patch.center,
-      PATCH_CONFIG.patchRadius
-    );
-
-    for (const [id, pos] of patchPositions) {
-      positions.set(id, pos);
-    }
+  for (const [dateStr, dayEntries] of entriesByDate) {
+    const monday = getWeekMonday(dayEntries[0].timestamp);
+    weekMondaySet.add(monday);
+    dayToWeekMonday.set(dateStr, monday);
   }
 
-  // Build debug info
-  const debugPatches: PatchDebugInfo[] = orderedPatches.map(p => ({
-    id: p.id,
-    center: p.center,
-    radius: PATCH_CONFIG.patchRadius,
-    assignedDay: p.assignedDay,
-    plantCount: p.plantIds.length,
-    freedAtMs: p.freedAtMs,
-  }));
+  const sortedWeekMondays = Array.from(weekMondaySet).sort();
+  const mondayToRowIndex = new Map<string, number>();
+  sortedWeekMondays.forEach((monday, index) => {
+    mondayToRowIndex.set(monday, index);
+  });
 
-  return { positions, patches: debugPatches };
+  const totalRows = sortedWeekMondays.length;
+
+  // --- Group days by week for summaries ---
+  const weekToDays = new Map<number, string[]>();
+  for (const [dateStr, weekMonday] of dayToWeekMonday) {
+    const rowIndex = mondayToRowIndex.get(weekMonday)!;
+    if (!weekToDays.has(rowIndex)) {
+      weekToDays.set(rowIndex, []);
+    }
+    weekToDays.get(rowIndex)!.push(dateStr);
+  }
+
+  // --- Position entries ---
+  const positions = new Map<string, [number, number, number]>();
+  const daySlotDebug: DaySlotDebug[] = [];
+
+  for (const [dateStr, dayEntries] of entriesByDate) {
+    const weekMonday = dayToWeekMonday.get(dateStr)!;
+    const rowIndex = mondayToRowIndex.get(weekMonday)!;
+    const dayIndex = getDayIndex(dayEntries[0].timestamp);
+
+    const slotX = getSlotX(dayIndex);
+    const rowZ = getRowZ(rowIndex, totalRows);
+    const slotCenter: [number, number] = [slotX, rowZ];
+
+    // Compute bloom radius for each entry (horizontal footprint)
+    const bloomRadii = dayEntries.map(entry => {
+      const plantType = getPlantType(entry.valenceClassification);
+      const scale = calculateScaleFromPercentile(entry.scalePercentile, plantType);
+      return (BLOOM_RADIUS_AT_SCALE_1[plantType] ?? 0.15) * scale;
+    });
+
+    const slotPositions = positionEntriesInDaySlot(
+      dayEntries,
+      slotCenter,
+      LAYOUT_CONFIG.entryClusterRadius,
+      bloomRadii
+    );
+
+    for (const [id, pos] of slotPositions) {
+      positions.set(id, pos);
+    }
+
+    daySlotDebug.push({
+      dateStr,
+      weekIndex: rowIndex,
+      dayIndex,
+      center: slotCenter,
+      entryCount: dayEntries.length,
+    });
+  }
+
+  // --- Build DaySummaries ---
+  const daySummaries = new Map<string, DaySummary>();
+  for (const [dateStr, dayEntries] of entriesByDate) {
+    const dayPositions = dayEntries
+      .map(e => positions.get(e.id))
+      .filter((p): p is [number, number, number] => p !== undefined);
+
+    daySummaries.set(dateStr, {
+      dateStr,
+      entryCount: dayEntries.length,
+      topEmotions: getTopEmotions(dayEntries, 3),
+      center: boundingBoxCenter(dayPositions),
+    });
+  }
+
+  // --- Build WeekSummaries ---
+  const weekSummaries = new Map<number, WeekSummary>();
+  for (let i = 0; i < totalRows; i++) {
+    const mondayStr = sortedWeekMondays[i];
+    const dayStrs = weekToDays.get(i) ?? [];
+    const weekEntries: MoodEntryWithPercentile[] = [];
+
+    for (const dayStr of dayStrs) {
+      weekEntries.push(...(entriesByDate.get(dayStr) ?? []));
+    }
+
+    // Count plant types
+    let flowerCount = 0, sproutCount = 0, decayCount = 0;
+    for (const entry of weekEntries) {
+      const plantType = getPlantType(entry.valenceClassification);
+      if (plantType === 'flower') flowerCount++;
+      else if (plantType === 'sprout') sproutCount++;
+      else decayCount++;
+    }
+
+    // Week date range
+    const monday = new Date(mondayStr + 'T00:00:00');
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+
+    // Positions for bounding box center
+    const weekPositions = weekEntries
+      .map(e => positions.get(e.id))
+      .filter((p): p is [number, number, number] => p !== undefined);
+
+    weekSummaries.set(i, {
+      weekIndex: i,
+      startDate: monday,
+      endDate: sunday,
+      flowerCount,
+      sproutCount,
+      decayCount,
+      topEmotions: getTopEmotions(weekEntries, 2),
+      center: boundingBoxCenter(weekPositions),
+    });
+  }
+
+  // --- Build week row debug info ---
+  const weekRowDebug: WeekRowDebug[] = sortedWeekMondays.map((mondayStr, index) => {
+    const dayStrs = weekToDays.get(index) ?? [];
+    let entryCount = 0;
+    for (const dayStr of dayStrs) {
+      entryCount += entriesByDate.get(dayStr)?.length ?? 0;
+    }
+
+    const sunday = new Date(mondayStr + 'T00:00:00');
+    sunday.setDate(sunday.getDate() + 6);
+
+    return {
+      weekIndex: index,
+      centerZ: getRowZ(index, totalRows),
+      startDate: mondayStr,
+      endDate: getDateString(sunday),
+      entryCount,
+    };
+  });
+
+  return {
+    positions,
+    debugInfo: {
+      weekRows: weekRowDebug,
+      daySlots: daySlotDebug,
+    },
+    daySummaries,
+    weekSummaries,
+  };
 }
 
 /**
  * Get configuration values (for debugging or UI display)
  */
 export function getLayoutConfig() {
-  return { ...PATCH_CONFIG };
-}
-
-// ============================================
-// LEGACY: Spiral-scatter system (kept for A/B comparison)
-// ============================================
-
-const SPIRAL_CONFIG = {
-  gardenRadius: 12,
-  spiralRotations: 3.5,
-  dayScatterRadius: 2,
-  entryScatterRadius: 1.5,
-  minEntrySpacing: 0.8,
-  minStemDistance: 2.0,
-};
-
-function spiralPoint(progress: number): [number, number] {
-  const maxAngle = SPIRAL_CONFIG.spiralRotations * 2 * Math.PI;
-  const angle = progress * maxAngle;
-  const minRadius = SPIRAL_CONFIG.gardenRadius * 0.1;
-  const maxRadius = SPIRAL_CONFIG.gardenRadius * 0.85;
-  const radius = minRadius + progress * (maxRadius - minRadius);
-  return [Math.cos(angle) * radius, Math.sin(angle) * radius];
-}
-
-export function calculatePositions_spiral(
-  entries: MoodEntryWithPercentile[]
-): Map<string, [number, number, number]> {
-  if (entries.length === 0) return new Map();
-
-  const positions = new Map<string, [number, number, number]>();
-  const earliestTime = entries[0].timestamp.getTime();
-  const latestTime = entries[entries.length - 1].timestamp.getTime();
-  const totalTimeSpan = latestTime - earliestTime;
-
-  const entriesByDate = new Map<string, MoodEntryWithPercentile[]>();
-  for (const entry of entries) {
-    const dateStr = getDateString(entry.timestamp);
-    if (!entriesByDate.has(dateStr)) entriesByDate.set(dateStr, []);
-    entriesByDate.get(dateStr)!.push(entry);
-  }
-
-  const dayPositions = new Map<string, [number, number]>();
-  for (const [dateStr, dayEntries] of entriesByDate) {
-    const dayTimestamp = dayEntries[0].timestamp.getTime();
-    const progress = totalTimeSpan > 0 ? (dayTimestamp - earliestTime) / totalTimeSpan : 0.5;
-    const [spiralX, spiralZ] = spiralPoint(progress);
-    const dayRandom = createSeededRandom(dateStringToSeed(dateStr));
-    const scatterAngle = dayRandom() * 2 * Math.PI;
-    const scatterDistance = dayRandom() * SPIRAL_CONFIG.dayScatterRadius;
-    const dayX = Math.max(-HALF_W, Math.min(HALF_W, spiralX + Math.cos(scatterAngle) * scatterDistance));
-    const dayZ = Math.max(-HALF_D, Math.min(HALF_D, spiralZ + Math.sin(scatterAngle) * scatterDistance));
-    dayPositions.set(dateStr, [dayX, dayZ]);
-  }
-
-  const allPlaced: [number, number][] = [];
-  function hasCollision(x: number, z: number): boolean {
-    return allPlaced.some(([px, pz]) => Math.sqrt((x - px) ** 2 + (z - pz) ** 2) < SPIRAL_CONFIG.minStemDistance);
-  }
-  function nudge(x: number, z: number, random: () => number): [number, number] {
-    let nx = x, nz = z, attempts = 0;
-    while (hasCollision(nx, nz) && attempts < 50) {
-      const dist = Math.sqrt(nx * nx + nz * nz);
-      const angle = dist > 0.01 ? Math.atan2(nz, nx) : random() * Math.PI * 2;
-      const nudgeAngle = angle + (random() - 0.5) * Math.PI * 0.5;
-      nx += Math.cos(nudgeAngle) * SPIRAL_CONFIG.minStemDistance * 0.5;
-      nz += Math.sin(nudgeAngle) * SPIRAL_CONFIG.minStemDistance * 0.5;
-      nx = Math.max(-HALF_W, Math.min(HALF_W, nx));
-      nz = Math.max(-HALF_D, Math.min(HALF_D, nz));
-      attempts++;
-    }
-    return [nx, nz];
-  }
-
-  for (const [dateStr, dayEntries] of entriesByDate) {
-    const [dayX, dayZ] = dayPositions.get(dateStr)!;
-    if (dayEntries.length === 1) {
-      const entryRandom = createSeededRandom(timestampToSeed(dayEntries[0].timestamp));
-      const [fx, fz] = nudge(dayX, dayZ, entryRandom);
-      allPlaced.push([fx, fz]);
-      positions.set(dayEntries[0].id, [fx, 0, fz]);
-    } else {
-      for (const entry of dayEntries) {
-        const entryRandom = createSeededRandom(timestampToSeed(entry.timestamp));
-        const angle = entryRandom() * 2 * Math.PI;
-        const distance = entryRandom() * SPIRAL_CONFIG.entryScatterRadius;
-        let ex = dayX + Math.cos(angle) * distance;
-        let ez = dayZ + Math.sin(angle) * distance;
-        [ex, ez] = nudge(ex, ez, entryRandom);
-        allPlaced.push([ex, ez]);
-        positions.set(entry.id, [ex, 0, ez]);
-      }
-    }
-  }
-
-  return positions;
+  return { ...LAYOUT_CONFIG };
 }
